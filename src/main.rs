@@ -222,6 +222,7 @@ fn main() {
                     "cubemap" => "samplerCube",
                     "buffer" => "sampler2D",
                     "video" => "sampler2D",
+                    "webcam" => "sampler2D",
                     "keyboard" => "sampler2D",
                     "music" => "sampler2D",
                     "musicstream" => "sampler2D",
