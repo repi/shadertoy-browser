@@ -136,8 +136,8 @@ fn main() {
 
     let client = reqwest::Client::new();
 
-    //for shadertoy in shadertoys {
-    shadertoys.par_iter().for_each(|shadertoy| {
+    for shadertoy in shadertoys {
+    //shadertoys.par_iter().for_each(|shadertoy| {
         let path = PathBuf::from(format!("output/{}.json", shadertoy));
 
         let mut json_str: String;
@@ -184,14 +184,28 @@ fn main() {
         let json = json::parse(&json_str).unwrap();
 
         for pass in json["Shader"]["renderpass"].members() {
-            if let Some(code) = pass["code"].as_str() {
 
-                let path = PathBuf::from(format!("output/{} {}.glsl", shadertoy, pass["name"].as_str().unwrap()));
+            if pass["type"] != "image" {
+                continue;
+            }
 
-                write_file(&path, code.as_bytes());
+            if let Some(shadertoy_source) = pass["code"].as_str() {
+
+                let full_source = format!("{}{}", header_source, shadertoy_source);
+
+                let glsl_path = PathBuf::from(format!("output/{} {}.glsl", shadertoy, pass["name"].as_str().unwrap()));
+                write_file(&glsl_path, full_source.as_bytes());
+
+                if let Ok(full_source_metal) = convert_glsl_to_metal("source.glsl", "main", full_source.as_str()) {
+
+                    let msl_path = PathBuf::from(format!("output/{} {}.metal", shadertoy, pass["name"].as_str().unwrap()));
+                    write_file(&msl_path, full_source_metal.as_bytes());                
+                }
             }
         }
 
         index.fetch_add(1, Ordering::SeqCst);
-    });
+//    });
+    }
+
 }
