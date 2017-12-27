@@ -72,6 +72,17 @@ fn convert_glsl_to_metal(name: &str, entry_point: &str, source: &str) -> Result<
 }
 
 fn write_file(path: &Path, buf: &[u8]) {
+
+    match path.parent() {
+        Some(parent_path) => {
+            match std::fs::create_dir_all(parent_path) {
+                Err(why) => println!("couldn't create directory: {:?}", why.kind()),
+                Ok(_) => {}
+            }
+        },
+        _ => (),
+    }
+    
     let mut file = match File::create(&path) {
         Err(why) => panic!("couldn't create {:?}: {}", path, why.description()),
         Ok(file) => file,
@@ -250,6 +261,36 @@ fn main() {
                     success = false;
                     println!("Failed compiling shader {}: {}", glsl_path.to_str().unwrap(), string);
                 }
+            }
+
+            // download texture inputs
+
+            for input in pass.inputs.iter() {
+
+                if input.ctype != "texture" {
+                    continue;
+                }
+
+                let path = PathBuf::from(format!("output{}", input.src));
+
+                if !path.exists() {
+
+                    let mut data_response = client.get(&format!("https://www.shadertoy.com/{}", input.src)).send().unwrap();
+                    
+                    let mut data = vec![];
+                    data_response.read_to_end(&mut data).unwrap();
+
+                    println!("Texture: {}, {} bytes", input.src, data.len());
+
+                    write_file(&path, &data);
+                }
+                else {
+
+                    if let Ok(metadata) = path.metadata() {
+                        println!("Texture: {}, {} bytes", input.src, metadata.len());
+                    }
+                }
+
             }
         }
 
