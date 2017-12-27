@@ -158,6 +158,9 @@ fn main() {
                 Ok(file) => file,
             };
 
+            let json = json::parse(&json_str).unwrap();
+            json_str = json::stringify_pretty(json, 4);
+
             file.write_all(json_str.as_bytes()).unwrap();
         } 
         else {
