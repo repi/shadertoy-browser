@@ -201,11 +201,6 @@ fn main() {
 
         for pass in root.shader.renderpass.iter() {
 
-            if pass.pass_type != "image" {
-                success = false;
-                continue;
-            }
-
             // generate a GLSL snippet containing the sampler declarations
             // as they are dependent on the renderpass inputs in the JSON
             // for exaxmple:
@@ -233,8 +228,13 @@ fn main() {
                 sampler_source.push_str(&format!("uniform {} iChannel{};\n", glsl_type, input.channel));
             }
 
+            let entry_point = match pass.pass_type.as_str() {
+                "sound" => "void main() { mainSound_(); }\n",
+                _ => "void main() { mainImage_(); }\n",
+            };            
+
             // add our header source first which includes shadertoy constant & resource definitions
-            let full_source = format!("{}{}{}", header_source, sampler_source, pass.code);
+            let full_source = format!("{}{}{}{}", header_source, sampler_source, entry_point, pass.code);
 
             // save out the source GLSL file, for debugging
             let glsl_path = PathBuf::from(format!("output/{} {}.glsl", shadertoy, pass.name));
