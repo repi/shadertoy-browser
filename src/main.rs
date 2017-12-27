@@ -143,6 +143,9 @@ fn main() {
 
     let client = reqwest::Client::new();
 
+
+    let mut built_shadertoys: Vec<String> = vec![];
+
     for shadertoy in shadertoys {
     //shadertoys.par_iter().for_each(|shadertoy| {
         let path = PathBuf::from(format!("output/{}.json", shadertoy));
@@ -190,9 +193,12 @@ fn main() {
 
         let json = json::parse(&json_str).unwrap();
 
+        let mut success = true;
+
         for pass in json["Shader"]["renderpass"].members() {
 
             if pass["type"] != "image" {
+                success = false;
                 continue;
             }
 
@@ -210,14 +216,20 @@ fn main() {
                         write_file(&msl_path, full_source_metal.as_bytes());                
                     }
                     Err(string) => {
+                        success = false;
                         println!("Failed compiling shader {}: {}", glsl_path.to_str().unwrap(), string);
                     }
                 }
             }
         }
 
+        if success {
+            built_shadertoys.push(shadertoy);
+        }
+
         index.fetch_add(1, Ordering::SeqCst);
 //    });
     }
 
+    println!("{} / {} shadetoys built", built_shadertoys.len(), shadertoys_len);
 }
