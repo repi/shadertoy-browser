@@ -22,12 +22,19 @@ fn convert_glsl_to_metal(name: &str, entry_point: &str, source: &str) -> Result<
     let mut compiler = shaderc::Compiler::new().unwrap();
     let options = shaderc::CompileOptions::new().unwrap();
 
-    let binary_result = compiler.compile_into_spirv(
+    let binary_result = match compiler.compile_into_spirv(
         source,
         shaderc::ShaderKind::Fragment,
         name,
         entry_point,
-        Some(&options)).unwrap();
+        Some(&options)) {
+
+        Ok(result) => result,
+        Err(err) => {
+            return Err(format!("shaderc compilation failed: {}", err));
+        },
+    };
+
 /*
     let text_result = compiler.compile_into_spirv_assembly(
         source,
@@ -49,8 +56,8 @@ fn convert_glsl_to_metal(name: &str, entry_point: &str, source: &str) -> Result<
         Ok(str) => Ok(str),
         Err(e) => {
             match e {
-                spirv_cross::ErrorCode::Unhandled => Err(String::from("Unhandled spirv-cross compiler error")),
-                spirv_cross::ErrorCode::CompilationError(str) => Err(str),
+                spirv_cross::ErrorCode::Unhandled => Err(String::from("spirv-cross handled error")),
+                spirv_cross::ErrorCode::CompilationError(str) => Err(format!("spirv-cross error: {}", str)),
             }
         }
     }
@@ -190,16 +197,21 @@ fn main() {
             }
 
             if let Some(shadertoy_source) = pass["code"].as_str() {
-
+                
+                // add our header source first which includes shadertoy constant & resource definitions
                 let full_source = format!("{}{}", header_source, shadertoy_source);
 
                 let glsl_path = PathBuf::from(format!("output/{} {}.glsl", shadertoy, pass["name"].as_str().unwrap()));
                 write_file(&glsl_path, full_source.as_bytes());
 
-                if let Ok(full_source_metal) = convert_glsl_to_metal("source.glsl", "main", full_source.as_str()) {
-
-                    let msl_path = PathBuf::from(format!("output/{} {}.metal", shadertoy, pass["name"].as_str().unwrap()));
-                    write_file(&msl_path, full_source_metal.as_bytes());                
+                match convert_glsl_to_metal(glsl_path.to_str().unwrap(), "main", full_source.as_str()) {
+                    Ok(full_source_metal) => {
+                        let msl_path = PathBuf::from(format!("output/{} {}.metal", shadertoy, pass["name"].as_str().unwrap()));
+                        write_file(&msl_path, full_source_metal.as_bytes());                
+                    }
+                    Err(string) => {
+                        println!("Failed compiling shader {}: {}", glsl_path.to_str().unwrap(), string);
+                    }
                 }
             }
         }
