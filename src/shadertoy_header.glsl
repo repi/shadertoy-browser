@@ -14,11 +14,6 @@ layout(binding = 1, std140) uniform glob
 	uniform vec4	iDate;
 };
 
-uniform sampler2D iChannel0;
-uniform sampler2D iChannel1;
-uniform sampler2D iChannel2;
-uniform sampler2D iChannel3;
-
 void mainImage(out vec4 fragColor, in vec2 fragCoord);
 
 layout(location = 0) in vec2 _fragCoord;

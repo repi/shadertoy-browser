@@ -155,6 +155,7 @@ fn main() {
 
     //let mut built_shadertoys: Vec<String> = vec![];
 
+    //for shadertoy in shadertoys.iter() {
     shadertoys.par_iter().for_each(|shadertoy| {
         let path = PathBuf::from(format!("output/{}.json", shadertoy));
 
@@ -172,7 +173,7 @@ fn main() {
             );
 
             let json: shadertoy::Root = serde_json::from_str(&json_str).unwrap();
-            let json_str = serde_json::to_string_pretty(&json).unwrap();            
+            json_str = serde_json::to_string_pretty(&json).unwrap();            
 
             write_file(&path, json_str.as_bytes());
         } 
@@ -205,14 +206,42 @@ fn main() {
                 continue;
             }
 
-            // add our header source first which includes shadertoy constant & resource definitions
-            let full_source = format!("{}{}", header_source, pass.code);
+            // generate a GLSL snippet containing the sampler declarations
+            // as they are dependent on the renderpass inputs in the JSON
+            // for exaxmple:
+            //     uniform sampler2D iChannel0;
+            //     uniform sampler2D iChannel1;
+            //     uniform sampler2D iChannel2;
+            //     uniform sampler2D iChannel3;
 
+            let mut sampler_source = String::new();
+            for input in pass.inputs.iter() {
+                let glsl_type = match input.ctype.as_str() {
+                    "texture" => "sampler2D",
+                    "volume" => "sampler3D",
+                    "cubemap" => "samplerCube",
+                    "buffer" => "sampler2D",
+                    "video" => "sampler2D",
+                    "keyboard" => "sampler2D",
+                    "music" => "sampler2D",
+                    "musicstream" => "sampler2D",
+                    _ => {
+                        panic!("Unknown ctype: {}", input.ctype); 
+                    }
+                };
+                sampler_source.push_str(&format!("uniform {} iChannel{};\n", glsl_type, input.channel));
+            }
+
+            // add our header source first which includes shadertoy constant & resource definitions
+            let full_source = format!("{}{}{}", header_source, sampler_source, pass.code);
+
+            // save out the source GLSL file, for debugging
             let glsl_path = PathBuf::from(format!("output/{} {}.glsl", shadertoy, pass.name));
             write_file(&glsl_path, full_source.as_bytes());
 
             match convert_glsl_to_metal(glsl_path.to_str().unwrap(), "main", full_source.as_str()) {
                 Ok(full_source_metal) => {
+                    // save out the generated Metal file, for debugging
                     let msl_path = PathBuf::from(format!("output/{} {}.metal", shadertoy, pass.name));
                     write_file(&msl_path, full_source_metal.as_bytes());                
                 }
@@ -231,5 +260,5 @@ fn main() {
         index.fetch_add(1, Ordering::SeqCst);
     });
 
-    println!("{} / {} shadetoys built", built_count.load(Ordering::SeqCst), shadertoys_len);
+    println!("{} / {} shadertoys fully built", built_count.load(Ordering::SeqCst), shadertoys_len);
 }
