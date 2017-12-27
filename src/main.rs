@@ -6,6 +6,14 @@ extern crate shaderc;
 extern crate spirv_cross;
 extern crate clap;
 
+
+#[macro_use]
+extern crate serde_derive;
+extern crate serde;
+extern crate serde_json;
+
+mod shadertoy;
+
 use clap::{Arg, App};
 use std::io::Write;
 use std::io::prelude::*;
@@ -140,14 +148,14 @@ fn main() {
     }
 
     let index = AtomicUsize::new(0);
+    let built_count = AtomicUsize::new(0);
 
     let client = reqwest::Client::new();
 
 
-    let mut built_shadertoys: Vec<String> = vec![];
+    //let mut built_shadertoys: Vec<String> = vec![];
 
-    for shadertoy in shadertoys {
-    //shadertoys.par_iter().for_each(|shadertoy| {
+    shadertoys.par_iter().for_each(|shadertoy| {
         let path = PathBuf::from(format!("output/{}.json", shadertoy));
 
         let mut json_str: String;
@@ -163,15 +171,10 @@ fn main() {
                 json_str.len()
             );
 
-            let mut file = match File::create(&path) {
-                Err(why) => panic!("couldn't create {:?}: {}", path, why.description()),
-                Ok(file) => file,
-            };
+            let json: shadertoy::Root = serde_json::from_str(&json_str).unwrap();
+            let json_str = serde_json::to_string_pretty(&json).unwrap();            
 
-            let json = json::parse(&json_str).unwrap();
-            json_str = json::stringify_pretty(json, 4);
-
-            file.write_all(json_str.as_bytes()).unwrap();
+            write_file(&path, json_str.as_bytes());
         } 
         else {
             println!(
@@ -191,45 +194,42 @@ fn main() {
         }
 
 
-        let json = json::parse(&json_str).unwrap();
+        let root: shadertoy::Root = serde_json::from_str(&json_str).unwrap();
 
         let mut success = true;
 
-        for pass in json["Shader"]["renderpass"].members() {
+        for pass in root.shader.renderpass.iter() {
 
-            if pass["type"] != "image" {
+            if pass.pass_type != "image" {
                 success = false;
                 continue;
             }
 
-            if let Some(shadertoy_source) = pass["code"].as_str() {
-                
-                // add our header source first which includes shadertoy constant & resource definitions
-                let full_source = format!("{}{}", header_source, shadertoy_source);
+            // add our header source first which includes shadertoy constant & resource definitions
+            let full_source = format!("{}{}", header_source, pass.code);
 
-                let glsl_path = PathBuf::from(format!("output/{} {}.glsl", shadertoy, pass["name"].as_str().unwrap()));
-                write_file(&glsl_path, full_source.as_bytes());
+            let glsl_path = PathBuf::from(format!("output/{} {}.glsl", shadertoy, pass.name));
+            write_file(&glsl_path, full_source.as_bytes());
 
-                match convert_glsl_to_metal(glsl_path.to_str().unwrap(), "main", full_source.as_str()) {
-                    Ok(full_source_metal) => {
-                        let msl_path = PathBuf::from(format!("output/{} {}.metal", shadertoy, pass["name"].as_str().unwrap()));
-                        write_file(&msl_path, full_source_metal.as_bytes());                
-                    }
-                    Err(string) => {
-                        success = false;
-                        println!("Failed compiling shader {}: {}", glsl_path.to_str().unwrap(), string);
-                    }
+            match convert_glsl_to_metal(glsl_path.to_str().unwrap(), "main", full_source.as_str()) {
+                Ok(full_source_metal) => {
+                    let msl_path = PathBuf::from(format!("output/{} {}.metal", shadertoy, pass.name));
+                    write_file(&msl_path, full_source_metal.as_bytes());                
+                }
+                Err(string) => {
+                    success = false;
+                    println!("Failed compiling shader {}: {}", glsl_path.to_str().unwrap(), string);
                 }
             }
         }
 
         if success {
-            built_shadertoys.push(shadertoy);
+            //built_shadertoys.push(shadertoy);
+            built_count.fetch_add(1, Ordering::SeqCst);
         }
 
         index.fetch_add(1, Ordering::SeqCst);
-//    });
-    }
+    });
 
-    println!("{} / {} shadetoys built", built_shadertoys.len(), shadertoys_len);
+    println!("{} / {} shadetoys built", built_count.load(Ordering::SeqCst), shadertoys_len);
 }
