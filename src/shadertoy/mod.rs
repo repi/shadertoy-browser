@@ -60,25 +60,9 @@ pub struct RenderPassOutput {
 pub struct Sampler {
 	pub filter: String,
 	pub wrap: String,
-
-    #[serde(deserialize_with = "de_from_str")]
-	pub vflip: bool,
-    #[serde(deserialize_with = "de_from_str")]
-	pub srgb: bool,
-
+	pub vflip: String,
+	pub srgb: String,
+	//pub vflip: bool,
+	//pub srgb: bool,
 	pub internal: String,
-}
-
-
-// workaround to support "true" and "false" for bool deserialization
-// from: https://users.rust-lang.org/t/serde-deserialize-string-field-in-json-to-a-different-type/12942
-
-use std::str::FromStr;
-use serde::{de, Deserialize, Deserializer};
-
-fn de_from_str<'de, D>(deserializer: D) -> Result<bool, D::Error>
-    where D: Deserializer<'de>
-{
-    let s = String::deserialize(deserializer)?;
-    bool::from_str(&s).map_err(de::Error::custom)
 }
