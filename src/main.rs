@@ -14,6 +14,48 @@ use std::error::Error;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use rayon::prelude::*;
 
+fn convert_glsl_to_metal(name: &str, entry_point: &str, source: &str) -> Result<String,String> {
+
+    // convert to SPIR-V using shaderc
+
+    let mut compiler = shaderc::Compiler::new().unwrap();
+    let mut options = shaderc::CompileOptions::new().unwrap();
+
+    let binary_result = compiler.compile_into_spirv(
+        source,
+        shaderc::ShaderKind::Fragment,
+        name,
+        entry_point,
+        Some(&options)).unwrap();
+/*
+    let text_result = compiler.compile_into_spirv_assembly(
+        source,
+        shaderc::ShaderKind::Fragment,
+        name,
+        entry_point,
+        Some(&options))?;
+*/
+
+    // convert SPIR-V to MSL
+
+    use spirv_cross::{spirv, msl};
+
+    let module = spirv::Module::from_words(binary_result.as_binary());
+
+    let mut ast = spirv::Ast::<msl::Target>::parse(&module).unwrap();
+    
+    match ast.compile() {
+        Ok(str) => Ok(str),
+        Err(e) => {
+            match e {
+                spirv_cross::ErrorCode::Unhandled => Err(String::from("Unhandled spirv-cross compiler error")),
+                spirv_cross::ErrorCode::CompilationError(str) => Err(str),
+            }
+        }
+    }
+}
+
+
 fn main() {
     let matches = App::new("Shadertoy Downloader")
                          .version("0.2")
@@ -26,6 +68,7 @@ fn main() {
                          	.help("Set shadertoy API key to use. Create your key on https://www.shadertoy.com/myapps")
                          .takes_value(true))
                          .get_matches();
+
 
     //let shadertoy_source = include_str!("shadertoy_test.glsl");
 
@@ -270,33 +313,9 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
 
     let source = format!("{}{}", header_source, shadertoy_source);
 
-    let mut compiler = shaderc::Compiler::new().unwrap();
-    let mut options = shaderc::CompileOptions::new().unwrap();
+    let metal_shader = convert_glsl_to_metal("source.glsl", "main", source.as_str()).unwrap();
 
-    let binary_result = compiler.compile_into_spirv(
-        source.as_str(),
-        shaderc::ShaderKind::Fragment,
-        "shader.glsl",
-        "main",
-        Some(&options)).unwrap();
-
-    let text_result = compiler.compile_into_spirv_assembly(
-        source.as_str(),
-        shaderc::ShaderKind::Fragment,
-        "shader.glsl",
-        "main",
-        Some(&options)).unwrap();
-
-
-    {
-        use spirv_cross::{spirv, hlsl, msl, ErrorCode};
-
-        let module = spirv::Module::from_words(binary_result.as_binary());
-
-        // Compile to MSL
-        let mut ast = spirv::Ast::<msl::Target>::parse(&module).unwrap();
-        println!("{}", ast.compile().unwrap());        
-    }
+    println!("{}", metal_shader);
 
     return;
 
