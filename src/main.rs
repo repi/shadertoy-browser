@@ -190,7 +190,7 @@ fn main() {
         } 
         else {
             println!(
-                "shadertoy ({} / {}): {}, already downloaded",
+                "shadertoy ({} / {}): {}",
                 index.load(Ordering::SeqCst),
                 shadertoys_len,
                 shadertoy
@@ -232,6 +232,7 @@ fn main() {
                     "keyboard" => "sampler2D",
                     "music" => "sampler2D",
                     "musicstream" => "sampler2D",
+                    "mic" => "sampler2D",
                     _ => {
                         panic!("Unknown ctype: {}", input.ctype); 
                     }
@@ -267,9 +268,10 @@ fn main() {
 
             for input in pass.inputs.iter() {
 
-                if input.ctype != "texture" {
-                    continue;
-                }
+                match input.ctype.as_str() {
+                    "texture" | "volume" | "cubemap" | "buffer" => (),
+                    _ => continue,
+                };
 
                 let path = PathBuf::from(format!("output{}", input.src));
 
@@ -280,14 +282,14 @@ fn main() {
                     let mut data = vec![];
                     data_response.read_to_end(&mut data).unwrap();
 
-                    println!("Texture: {}, {} bytes", input.src, data.len());
+                    println!("Asset downloaded: {}, {} bytes", input.src, data.len());
 
                     write_file(&path, &data);
                 }
                 else {
 
                     if let Ok(metadata) = path.metadata() {
-                        println!("Texture: {}, {} bytes", input.src, metadata.len());
+                        println!("Asset: {}, {} bytes", input.src, metadata.len());
                     }
                 }
 
