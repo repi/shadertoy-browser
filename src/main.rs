@@ -9,6 +9,7 @@ extern crate shaderc;
 extern crate spirv_cross;
 extern crate clap;
 extern crate winit;
+extern crate rust_base58 as base58;
 
 extern crate cocoa;
 #[macro_use] extern crate objc;
@@ -49,6 +50,7 @@ use std::any::Any;
 use std::time::Instant;
 use floating_duration::TimeAsFloat;
 use chrono::prelude::*;
+use base58::ToBase58;
 
 
 #[allow(non_snake_case)]
@@ -193,7 +195,6 @@ impl RenderBackend for MetalRenderBackend {
         layer.set_drawable_size(NSSize::new(draw_size.0 as f64, draw_size.1 as f64));
 
         self.layer = Some(layer);
-        //self.pool = Box::new(unsafe { NSAutoreleasePool::new(cocoa::base::nil) });        
     }
 
     fn present(&mut self, params: RenderParams) {
@@ -266,12 +267,6 @@ impl RenderBackend for MetalRenderBackend {
 
                 command_buffer.present_drawable(&drawable);
                 command_buffer.commit();
-            /*  
-                unsafe { 
-                    msg_send![*self.pool, release];
-                    self.pool = Box::new(NSAutoreleasePool::new(cocoa::base::nil));
-                }
-            */
             }    
         }
 
@@ -377,8 +372,6 @@ fn main() {
 
     let mut shadertoys: Vec<String> = vec![]; {
 
-        let client = reqwest::Client::new();
-
         let query_str: String = {
             if let Some(search_str) = matches.value_of("search") {
                 format!("https://www.shadertoy.com/api/v1/shaders/query/{}?key={}", search_str, api_key)
@@ -388,7 +381,24 @@ fn main() {
             }
         };
 
-        let str = client.get(&query_str).send().unwrap().text().unwrap();
+        let path = PathBuf::from(&format!("output/query/{}", query_str.as_bytes().to_base58()));
+
+        let mut str;
+
+        if path.exists() {
+            let mut file = match File::open(&path) {
+                Err(why) => panic!("couldn't open {:?}: {}", path, why.description()),
+                Ok(file) => file,
+            };
+
+            str = String::new();
+            file.read_to_string(&mut str).unwrap();                
+        }
+        else {
+            let client = reqwest::Client::new();
+            str = client.get(&query_str).send().unwrap().text().unwrap();
+            write_file(&path, str.as_bytes());            
+        }
 
         let json = json::parse(&str).unwrap();
 
