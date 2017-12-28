@@ -2,6 +2,12 @@
 name = "shadertoy"
 version = "0.1.0"
 authors = ["Johan Andersson <repi@repi.se>"]
+homepage = "https://github.com/repi/shadertoy_viewer/src/shadertoy"
+repository = "https://github.com/repi/shadertoy_viewer/src/shadertoy"
+readme = "README.md"
+license = "MIT/Apache-2.0"
+keywords = ["shaders", "shadertoy", "render", "mac", "metal"]
+categories = ["rendering"]
 
 [dependencies]
 reqwest = "0.8.2"
