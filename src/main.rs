@@ -630,7 +630,7 @@ fn main() {
         let mut running = true;
   
         let mut cursor_pos = (0.0f64, 0.0f64);
-        let mut shadertoy_index = 0;
+        let mut shadertoy_index = 0usize;
 
         while running {
 
@@ -640,11 +640,20 @@ fn main() {
                     winit::Event::WindowEvent{ event: winit::WindowEvent::CursorMoved { position, .. }, .. } => {
                         cursor_pos = position;
                     },
-                    winit::Event::WindowEvent{ event: winit::WindowEvent::MouseInput { state, .. }, .. } => {
-                        if state == winit::ElementState::Pressed {
-                            shadertoy_index += 1;
-                            if shadertoy_index >= built_shadertoy_shaders.len() {
-                                shadertoy_index = 0;
+                    winit::Event::WindowEvent{ event: winit::WindowEvent::KeyboardInput { input, .. }, .. } => {
+                        if input.state == winit::ElementState::Pressed {
+                            match input.virtual_keycode {
+                                Some(winit::VirtualKeyCode::Left) => {
+                                    if shadertoy_index != 0 {
+                                        shadertoy_index -= 1;
+                                    }
+                                },
+                                Some(winit::VirtualKeyCode::Right) => {
+                                    if shadertoy_index+1 < built_shadertoy_shaders.len() {
+                                        shadertoy_index += 1;
+                                    }
+                                },
+                                _ => (),
                             }
                         }
                     },
