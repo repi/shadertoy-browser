@@ -113,6 +113,8 @@ fn main() {
 
 
     let header_source = include_str!("shadertoy_header.glsl");
+    let image_footer_source = include_str!("shadertoy_image_footer.glsl");
+    let sound_footer_source = include_str!("shadertoy_sound_footer.glsl");
 /*
     let shadertoy_source = include_str!("shadertoy_test.glsl");
 
@@ -240,13 +242,13 @@ fn main() {
                 sampler_source.push_str(&format!("uniform {} iChannel{};\n", glsl_type, input.channel));
             }
 
-            let entry_point = match pass.pass_type.as_str() {
-                "sound" => "void main() { mainSound_(); }\n",
-                _ => "void main() { mainImage_(); }\n",
+            let footer_source = match pass.pass_type.as_str() {
+                "sound" => sound_footer_source,
+                _ => image_footer_source,
             };            
 
             // add our header source first which includes shadertoy constant & resource definitions
-            let full_source = format!("{}{}{}{}", header_source, sampler_source, entry_point, pass.code);
+            let full_source = format!("{}\n{}\n{}\n{}", header_source, sampler_source, pass.code, footer_source);
 
             // save out the source GLSL file, for debugging
             let glsl_path = PathBuf::from(format!("output/{} {}.glsl", shadertoy, pass.name));
