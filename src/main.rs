@@ -81,6 +81,7 @@ struct ShadertoyConstants {
 
 pub struct RenderParams {
     pub mouse_cursor_pos: (f64, f64),
+    pub shader_source: String,
 }
 
 pub trait RenderBackend {
@@ -97,7 +98,8 @@ struct MetalRenderBackend {
     time: Instant,
     time_last_frame: Instant,
 
-    pipeline_state: metal::RenderPipelineState,
+    shader_source: String,
+    pipeline_state: Option<metal::RenderPipelineState>,
 }
 
 #[allow(non_snake_case)]
@@ -136,27 +138,6 @@ fn TEST_new_library_with_source(device: &metal::Device, src: &str, options: &met
 impl MetalRenderBackend {
     fn new() -> MetalRenderBackend {
         let device = metal::Device::system_default();
-   
-        let compile_options = metal::CompileOptions::new();
-        
-        let vs_source = include_str!("shadertoy_vs.metal");
-        let ps_source = include_str!("shadertoy_test3.metal");
-
-        let vs_library = TEST_new_library_with_source(&device, vs_source, &compile_options).unwrap();
-        let ps_library = TEST_new_library_with_source(&device, ps_source, &compile_options).unwrap();
-
-        let vs = vs_library.get_function("vsMain", None).unwrap();
-        let ps = ps_library.get_function("main0", None).unwrap();
-
-        let vertex_desc = metal::VertexDescriptor::new();
-
-        let pipeline_desc = metal::RenderPipelineDescriptor::new();
-        pipeline_desc.set_vertex_function(Some(&vs));
-        pipeline_desc.set_fragment_function(Some(&ps));
-        pipeline_desc.set_vertex_descriptor(Some(vertex_desc));
-        pipeline_desc.color_attachments().object_at(0).unwrap().set_pixel_format(metal::MTLPixelFormat::BGRA8Unorm);
-
-        let pipeline_state = device.new_render_pipeline_state(&pipeline_desc).unwrap();
 
         let command_queue = device.new_command_queue();
 
@@ -167,7 +148,49 @@ impl MetalRenderBackend {
             frame_index: 0,
             time: Instant::now(),
             time_last_frame: Instant::now(),
-            pipeline_state: pipeline_state,
+            shader_source: String::new(),
+            pipeline_state: None,
+        }
+    }
+
+    fn create_pipeline_state(&self, shader_source: String) -> Result<metal::RenderPipelineState,String> {
+        let compile_options = metal::CompileOptions::new();
+        
+        let vs_source = include_str!("shadertoy_vs.metal");
+        let ps_source = shader_source;
+
+        let vs_library = TEST_new_library_with_source(&self.device, vs_source, &compile_options)?;
+        let ps_library = TEST_new_library_with_source(&self.device, &ps_source, &compile_options)?;
+
+        let vs = vs_library.get_function("vsMain", None)?;
+        let ps = ps_library.get_function("main0", None)?;
+
+        let vertex_desc = metal::VertexDescriptor::new();
+
+        let pipeline_desc = metal::RenderPipelineDescriptor::new();
+        pipeline_desc.set_vertex_function(Some(&vs));
+        pipeline_desc.set_fragment_function(Some(&ps));
+        pipeline_desc.set_vertex_descriptor(Some(vertex_desc));
+        pipeline_desc.color_attachments().object_at(0).unwrap().set_pixel_format(metal::MTLPixelFormat::BGRA8Unorm);
+
+        return self.device.new_render_pipeline_state(&pipeline_desc);
+    }
+   
+
+    fn update_shader(&mut self, shader_source: String) {
+   
+        if shader_source == self.shader_source {
+            return;
+        }
+
+        self.shader_source = shader_source.clone();
+
+        self.pipeline_state = match self.create_pipeline_state(shader_source) {
+            Ok(pipeline_state) => Some(pipeline_state),
+            Err(string) => {
+                println!("Error creating pipeline state: {}", string);
+                None
+            },
         }
     }
 }
@@ -198,6 +221,12 @@ impl RenderBackend for MetalRenderBackend {
     }
 
     fn present(&mut self, params: RenderParams) {
+
+        self.update_shader(params.shader_source);
+
+        if self.pipeline_state.is_none() {
+            return;
+        }
 
         //println!("frame: {}", self.frame_index);
 
@@ -253,7 +282,9 @@ impl RenderBackend for MetalRenderBackend {
                 let command_buffer = self.command_queue.new_command_buffer();
                 let parallel_encoder = command_buffer.new_parallel_render_command_encoder(&render_pass_descriptor);
                 let encoder = parallel_encoder.render_command_encoder();
-                encoder.set_render_pipeline_state(&self.pipeline_state);
+                if let Some(ref pipeline_state) = self.pipeline_state {
+                    encoder.set_render_pipeline_state(&pipeline_state);
+                }
                 encoder.set_cull_mode(metal::MTLCullMode::None);
 
                 let constants_ptr: *const ShadertoyConstants = &constants;
@@ -267,11 +298,11 @@ impl RenderBackend for MetalRenderBackend {
 
                 command_buffer.present_drawable(&drawable);
                 command_buffer.commit();
+
+                self.frame_index += 1;
+                self.time_last_frame = Instant::now();
             }    
         }
-
-        self.frame_index += 1;
-        self.time_last_frame = Instant::now();
     }
 }
 
@@ -424,10 +455,10 @@ fn main() {
     let client = reqwest::Client::new();
 
 
-    //let mut built_shadertoys: Vec<String> = vec![];
+    let mut built_shadertoy_shaders: Vec<String> = vec![];
 
-    //for shadertoy in shadertoys.iter() {
-    shadertoys.par_iter().for_each(|shadertoy| {
+    for shadertoy in shadertoys.iter() {
+//    shadertoys.par_iter().for_each(|shadertoy| {
 
         index.fetch_add(1, Ordering::SeqCst);
 
@@ -524,6 +555,10 @@ fn main() {
                     // save out the generated Metal file, for debugging
                     let msl_path = PathBuf::from(format!("output/{} {}.metal", shadertoy, pass.name));
                     write_file(&msl_path, full_source_metal.as_bytes());                
+
+                    if pass.pass_type == "image" && pass.inputs.len() == 0 {
+                        built_shadertoy_shaders.push(full_source_metal);
+                    }
                 }
                 Err(string) => {
                     success = false;
@@ -564,16 +599,18 @@ fn main() {
         }
 
         if success {
-            //built_shadertoys.push(shadertoy);
             built_count.fetch_add(1, Ordering::SeqCst);
         }
-    });
+//    });
+    }
 
     println!("{} / {} shadertoys fully built", built_count.load(Ordering::SeqCst), shadertoys_len);
 
 
 
-
+    if built_shadertoy_shaders.len() == 0 {
+        return;
+    }
 
     if matches.is_present("render") {
 
@@ -593,6 +630,7 @@ fn main() {
         let mut running = true;
   
         let mut cursor_pos = (0.0f64, 0.0f64);
+        let mut shadertoy_index = 0;
 
         while running {
 
@@ -601,13 +639,23 @@ fn main() {
                     winit::Event::WindowEvent{ event: winit::WindowEvent::Closed, .. } => running = false,
                     winit::Event::WindowEvent{ event: winit::WindowEvent::CursorMoved { position, .. }, .. } => {
                         cursor_pos = position;
-                    }
-                    _ => ()
+                    },
+                    winit::Event::WindowEvent{ event: winit::WindowEvent::MouseInput { state, .. }, .. } => {
+                        if state == winit::ElementState::Pressed {
+                            shadertoy_index += 1;
+                            if shadertoy_index >= built_shadertoy_shaders.len() {
+                                shadertoy_index = 0;
+                            }
+                        }
+                    },
+                    _ => (),
                 }
             });
 
+
             render_backend.present(RenderParams {
-                mouse_cursor_pos: cursor_pos 
+                mouse_cursor_pos: cursor_pos,
+                shader_source: built_shadertoy_shaders[shadertoy_index].clone()
             });
 
             unsafe { 
