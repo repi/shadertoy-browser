@@ -1,16 +1,28 @@
+#![allow(dead_code)]
+
 extern crate reqwest;
 extern crate json;
 extern crate floating_duration;
+extern crate chrono;
 extern crate rayon;
 extern crate shaderc;
 extern crate spirv_cross;
 extern crate clap;
+extern crate winit;
 
+extern crate cocoa;
+#[macro_use] extern crate objc;
+extern crate objc_foundation;
 
 #[macro_use]
 extern crate serde_derive;
 extern crate serde;
 extern crate serde_json;
+
+extern crate libc;
+extern crate foreign_types;
+extern crate metal_rs as metal;
+
 
 mod shadertoy;
 
@@ -22,6 +34,251 @@ use std::path::{Path,PathBuf};
 use std::error::Error;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use rayon::prelude::*;
+use cocoa::foundation::NSAutoreleasePool;
+use std::ffi::CStr;
+use objc::runtime::{Object, YES};
+use foreign_types::ForeignType;
+
+use cocoa::base::id as cocoa_id;
+use cocoa::foundation::{NSSize};
+use cocoa::appkit::{NSWindow, NSView};
+use winit::os::macos::WindowExt;
+use std::mem;
+use std::any::Any;
+
+use std::time::Instant;
+use floating_duration::TimeAsFloat;
+use chrono::prelude::*;
+
+
+#[allow(non_snake_case)]
+struct ShadertoyConstants {
+    // The viewport resolution (z is pixel aspect ratio, usually 1.0).
+    iResolution: (f32, f32, f32),
+    pad1: f32,
+    /// xy contain the current pixel coords (if LMB is down). zw contain the click pixel.
+    iMouse: (f32, f32, f32, f32),
+    /// Current time in seconds.
+    iTime: f32,
+    /// Delta time since last frame.
+    iTimeDelta: f32,
+    /// Number of frames rendered per second.
+    iFrameRate: f32,
+    /// Sound sample rate (typically 44100).
+    iSampleRate: f32, 
+    /// Current frame
+    iFrame: i32,
+    pad2: [i32; 3],
+    /// Year, month, day, time in seconds in .xyzw
+    iDate: (f32, f32, f32, f32),      
+    /// Time for channel (if video or sound), in seconds   
+    iChannelTime: [f32; 4],
+    /// Input texture resolution for each channel
+    iChannelResolution: [(f32, f32, f32, f32); 4],
+}
+
+pub struct RenderParams {
+    pub mouse_cursor_pos: (f64, f64),
+}
+
+pub trait RenderBackend {
+    fn init_window(&mut self, window: &Any);
+    fn present(&mut self, params: RenderParams);
+}
+
+struct MetalRenderBackend {
+    device: metal::Device,
+    command_queue: metal::CommandQueue,
+
+    layer: Option<metal::CoreAnimationLayer>,
+    frame_index: u64,
+    time: Instant,
+    time_last_frame: Instant,
+
+    pipeline_state: metal::RenderPipelineState,
+}
+
+#[allow(non_snake_case)]
+fn TEST_new_library_with_source(device: &metal::Device, src: &str, options: &metal::CompileOptionsRef) -> Result<metal::Library, String> {
+    use cocoa::foundation::NSString as cocoa_NSString;
+    use cocoa::base::nil as cocoa_nil;
+
+    unsafe {
+        let source = cocoa_NSString::alloc(cocoa_nil).init_str(src);
+
+        let mut err: *mut ::objc::runtime::Object = ::std::ptr::null_mut();
+
+        let library: *mut metal::MTLLibrary = { 
+            msg_send![*device, newLibraryWithSource:source
+                                        options:options
+                                        error:&mut err]
+        };
+
+        if !library.is_null() {
+            return Result::Ok(metal::Library::from_ptr(library));
+        }
+
+        if !err.is_null() {
+            let desc: *mut Object = msg_send![err, localizedDescription];
+            let compile_error: *const ::libc::c_char = msg_send![desc, UTF8String];
+            let message = CStr::from_ptr(compile_error).to_string_lossy().into_owned();
+            msg_send![err, release];
+            return Err(message);
+        }
+
+        return Err(String::from("unreachable?"));
+    }
+}
+
+
+impl MetalRenderBackend {
+    fn new() -> MetalRenderBackend {
+        let device = metal::Device::system_default();
+   
+        let compile_options = metal::CompileOptions::new();
+        
+        let vs_source = include_str!("shadertoy_vs.metal");
+        let ps_source = include_str!("shadertoy_test3.metal");
+
+        let vs_library = TEST_new_library_with_source(&device, vs_source, &compile_options).unwrap();
+        let ps_library = TEST_new_library_with_source(&device, ps_source, &compile_options).unwrap();
+
+        let vs = vs_library.get_function("vsMain", None).unwrap();
+        let ps = ps_library.get_function("main0", None).unwrap();
+
+        let vertex_desc = metal::VertexDescriptor::new();
+
+        let pipeline_desc = metal::RenderPipelineDescriptor::new();
+        pipeline_desc.set_vertex_function(Some(&vs));
+        pipeline_desc.set_fragment_function(Some(&ps));
+        pipeline_desc.set_vertex_descriptor(Some(vertex_desc));
+        pipeline_desc.color_attachments().object_at(0).unwrap().set_pixel_format(metal::MTLPixelFormat::BGRA8Unorm);
+
+        let pipeline_state = device.new_render_pipeline_state(&pipeline_desc).unwrap();
+
+        let command_queue = device.new_command_queue();
+
+        MetalRenderBackend {
+            device, 
+            command_queue,
+            layer: None,
+            frame_index: 0,
+            time: Instant::now(),
+            time_last_frame: Instant::now(),
+            pipeline_state: pipeline_state,
+        }
+    }
+}
+
+impl RenderBackend for MetalRenderBackend {
+    fn init_window(&mut self, window: &Any) {
+
+        let winit_window = window.downcast_ref::<winit::Window>().unwrap();
+
+        let cocoa_window: cocoa_id = unsafe { mem::transmute(winit_window.get_nswindow()) };
+
+        let layer = metal::CoreAnimationLayer::new();
+        layer.set_device(&self.device);
+        layer.set_pixel_format(metal::MTLPixelFormat::BGRA8Unorm);
+        layer.set_presents_with_transaction(false);
+
+        unsafe {
+            let view = cocoa_window.contentView();
+            view.setWantsBestResolutionOpenGLSurface_(YES);
+            view.setWantsLayer(YES);
+            view.setLayer(mem::transmute(layer.as_ref()));
+        }
+
+        let draw_size = winit_window.get_inner_size().unwrap();
+        layer.set_drawable_size(NSSize::new(draw_size.0 as f64, draw_size.1 as f64));
+
+        self.layer = Some(layer);
+        //self.pool = Box::new(unsafe { NSAutoreleasePool::new(cocoa::base::nil) });        
+    }
+
+    fn present(&mut self, params: RenderParams) {
+
+        //println!("frame: {}", self.frame_index);
+
+        if let Some(ref layer) = self.layer {
+            if let Some(drawable) = layer.next_drawable() {
+
+                let mut constants = {
+                    let w = drawable.texture().width() as f32;
+                    let h = drawable.texture().height() as f32;
+
+                    let time = self.time.elapsed().as_fractional_secs() as f32;
+                    let delta_time = self.time_last_frame.elapsed().as_fractional_secs() as f32;
+
+                    let dt: DateTime<Local> = Local::now();
+                    
+                    ShadertoyConstants {
+                        iResolution: (w, h, w / h),
+                        pad1: 0.0,
+                        iMouse: (
+                            params.mouse_cursor_pos.0 as f32,
+                            params.mouse_cursor_pos.1 as f32,
+                            0.0,
+                            0.0),
+                        iTime: time,
+                        iTimeDelta: delta_time,
+                        iFrameRate: 1.0 / delta_time,
+                        iSampleRate: 44100.0,
+                        iFrame: self.frame_index as i32,
+                        pad2: [0, 0, 0],
+                        iDate: (
+                            dt.year() as f32, 
+                            dt.month() as f32, 
+                            dt.day() as f32, 
+                            dt.second() as f32 // TODO unclear what seconds should be here?
+                        ), 
+                        iChannelTime: [time, time, time, time], // TODO not correct
+                        iChannelResolution: [
+                            (0.0, 0.0, 0.0, 0.0),
+                            (0.0, 0.0, 0.0, 0.0),
+                            (0.0, 0.0, 0.0, 0.0),
+                            (0.0, 0.0, 0.0, 0.0),
+                        ],
+                    }
+                };
+                
+                let render_pass_descriptor = metal::RenderPassDescriptor::new();
+                let color_attachment = render_pass_descriptor.color_attachments().object_at(0).unwrap();
+                color_attachment.set_texture(Some(drawable.texture()));
+                color_attachment.set_load_action(metal::MTLLoadAction::Clear);
+                color_attachment.set_clear_color(metal::MTLClearColor::new(((self.frame_index%100) as f64) / 100f64, 0.2, 0.2, 1.0));
+                color_attachment.set_store_action(metal::MTLStoreAction::Store);
+        
+                let command_buffer = self.command_queue.new_command_buffer();
+                let parallel_encoder = command_buffer.new_parallel_render_command_encoder(&render_pass_descriptor);
+                let encoder = parallel_encoder.render_command_encoder();
+                encoder.set_render_pipeline_state(&self.pipeline_state);
+                encoder.set_cull_mode(metal::MTLCullMode::None);
+
+                let constants_ptr: *const ShadertoyConstants = &constants;
+                let constants_cptr = constants_ptr as *mut libc::c_void;
+                encoder.set_vertex_bytes(0, std::mem::size_of::<ShadertoyConstants>() as u64, constants_cptr);
+                encoder.set_fragment_bytes(0, std::mem::size_of::<ShadertoyConstants>() as u64, constants_cptr);
+
+                encoder.draw_primitives(metal::MTLPrimitiveType::Triangle, 0, 3);
+                encoder.end_encoding();
+                parallel_encoder.end_encoding();
+
+                command_buffer.present_drawable(&drawable);
+                command_buffer.commit();
+            /*  
+                unsafe { 
+                    msg_send![*self.pool, release];
+                    self.pool = Box::new(NSAutoreleasePool::new(cocoa::base::nil));
+                }
+            */
+            }    
+        }
+
+        self.frame_index += 1;
+        self.time_last_frame = Instant::now();
+    }
+}
 
 fn convert_glsl_to_metal(name: &str, entry_point: &str, source: &str) -> Result<String,String> {
 
@@ -109,26 +366,17 @@ fn main() {
                          	.value_name("stringy")
                          	.help("Search string to filter which shadertoys to get")                         
                             .takes_value(true))
+                        .arg(Arg::with_name("render")
+                            .short("r")
+                            .long("render")
+                            .help("Render shadertoys in a window, otherwise will just download shadertoys"))
                          .get_matches();
 
 
-    let header_source = include_str!("shadertoy_header.glsl");
-    let image_footer_source = include_str!("shadertoy_image_footer.glsl");
-    let sound_footer_source = include_str!("shadertoy_sound_footer.glsl");
-/*
-    let shadertoy_source = include_str!("shadertoy_test.glsl");
-
-    let source = format!("{}{}", header_source, shadertoy_source);
-
-    let metal_shader = convert_glsl_to_metal("source.glsl", "main", source.as_str()).unwrap();
-
-    println!("{}", metal_shader);
-*/
-
     let api_key = matches.value_of("apikey").unwrap();
 
-    let mut shadertoys: Vec<String> = vec![];
-    {
+    let mut shadertoys: Vec<String> = vec![]; {
+
         let client = reqwest::Client::new();
 
         let query_str: String = {
@@ -242,6 +490,10 @@ fn main() {
                 sampler_source.push_str(&format!("uniform {} iChannel{};\n", glsl_type, input.channel));
             }
 
+            let header_source = include_str!("shadertoy_header.glsl");
+            let image_footer_source = include_str!("shadertoy_image_footer.glsl");
+            let sound_footer_source = include_str!("shadertoy_sound_footer.glsl");
+
             let footer_source = match pass.pass_type.as_str() {
                 "sound" => sound_footer_source,
                 _ => image_footer_source,
@@ -307,4 +559,50 @@ fn main() {
     });
 
     println!("{} / {} shadertoys fully built", built_count.load(Ordering::SeqCst), shadertoys_len);
+
+
+
+
+
+    if matches.is_present("render") {
+
+        let mut events_loop = winit::EventsLoop::new();
+        let window = winit::WindowBuilder::new()
+            .with_dimensions(1024, 768)
+            .with_title("Metal".to_string())
+            .build(&events_loop).unwrap();
+
+        let mut render_backend = MetalRenderBackend::new();
+        render_backend.init_window(&window);
+
+
+
+        let mut pool = unsafe { NSAutoreleasePool::new(cocoa::base::nil) };
+
+        let mut running = true;
+  
+        let mut cursor_pos = (0.0f64, 0.0f64);
+
+        while running {
+
+            events_loop.poll_events(|event| {
+                match event {
+                    winit::Event::WindowEvent{ event: winit::WindowEvent::Closed, .. } => running = false,
+                    winit::Event::WindowEvent{ event: winit::WindowEvent::CursorMoved { position, .. }, .. } => {
+                        cursor_pos = position;
+                    }
+                    _ => ()
+                }
+            });
+
+            render_backend.present(RenderParams {
+                mouse_cursor_pos: cursor_pos 
+            });
+
+            unsafe { 
+                msg_send![pool, release];
+                pool = NSAutoreleasePool::new(cocoa::base::nil);
+            }            
+        }
+    }    
 }
