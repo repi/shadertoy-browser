@@ -20,6 +20,4 @@ at your option.
 
 ### Contribution
 
-Unless you explicitly state otherwise, any contribution intentionally submitted
-for inclusion in the work by you shall be dual licensed as above, without any
-additional terms or conditions.
+Contribution is very welcome! Please note that your contributions are assumed to be dual-licensed under Apache-2.0/MIT.
