@@ -31,8 +31,8 @@ use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::error::Error;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::thread;
-use rayon::prelude::*;
+//use std::thread;
+//use rayon::prelude::*;
 use cocoa::foundation::NSAutoreleasePool;
 use std::ffi::CStr;
 use objc::runtime::{Object, YES};
@@ -233,7 +233,7 @@ impl RenderBackend for MetalRenderBackend {
         if let Some(ref layer) = self.layer {
             if let Some(drawable) = layer.next_drawable() {
 
-                let mut constants = {
+                let constants = {
                     let w = drawable.texture().width() as f32;
                     let h = drawable.texture().height() as f32;
 
