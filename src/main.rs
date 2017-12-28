@@ -418,6 +418,9 @@ fn main() {
 
     //for shadertoy in shadertoys.iter() {
     shadertoys.par_iter().for_each(|shadertoy| {
+
+        index.fetch_add(1, Ordering::SeqCst);
+
         let path = PathBuf::from(format!("output/{}.json", shadertoy));
 
         let mut json_str: String;
@@ -554,8 +557,6 @@ fn main() {
             //built_shadertoys.push(shadertoy);
             built_count.fetch_add(1, Ordering::SeqCst);
         }
-
-        index.fetch_add(1, Ordering::SeqCst);
     });
 
     println!("{} / {} shadertoys fully built", built_count.load(Ordering::SeqCst), shadertoys_len);
