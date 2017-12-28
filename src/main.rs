@@ -12,7 +12,8 @@ extern crate winit;
 extern crate rust_base58 as base58;
 
 extern crate cocoa;
-#[macro_use] extern crate objc;
+#[macro_use]
+extern crate objc;
 extern crate objc_foundation;
 
 #[macro_use]
@@ -31,7 +32,7 @@ use clap::{Arg, App};
 use std::io::Write;
 use std::io::prelude::*;
 use std::fs::File;
-use std::path::{Path,PathBuf};
+use std::path::{Path, PathBuf};
 use std::error::Error;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use rayon::prelude::*;
@@ -41,7 +42,7 @@ use objc::runtime::{Object, YES};
 use foreign_types::ForeignType;
 
 use cocoa::base::id as cocoa_id;
-use cocoa::foundation::{NSSize};
+use cocoa::foundation::NSSize;
 use cocoa::appkit::{NSWindow, NSView};
 use winit::os::macos::WindowExt;
 use std::mem;
@@ -67,13 +68,13 @@ struct ShadertoyConstants {
     /// Number of frames rendered per second.
     iFrameRate: f32,
     /// Sound sample rate (typically 44100).
-    iSampleRate: f32, 
+    iSampleRate: f32,
     /// Current frame
     iFrame: i32,
     pad2: [i32; 3],
     /// Year, month, day, time in seconds in .xyzw
-    iDate: (f32, f32, f32, f32),      
-    /// Time for channel (if video or sound), in seconds   
+    iDate: (f32, f32, f32, f32),
+    /// Time for channel (if video or sound), in seconds
     iChannelTime: [f32; 4],
     /// Input texture resolution for each channel
     iChannelResolution: [(f32, f32, f32, f32); 4],
@@ -112,7 +113,7 @@ fn TEST_new_library_with_source(device: &metal::Device, src: &str, options: &met
 
         let mut err: *mut ::objc::runtime::Object = ::std::ptr::null_mut();
 
-        let library: *mut metal::MTLLibrary = { 
+        let library: *mut metal::MTLLibrary = {
             msg_send![*device, newLibraryWithSource:source
                                         options:options
                                         error:&mut err]
@@ -142,7 +143,7 @@ impl MetalRenderBackend {
         let command_queue = device.new_command_queue();
 
         MetalRenderBackend {
-            device, 
+            device,
             command_queue,
             layer: None,
             frame_index: 0,
@@ -153,9 +154,9 @@ impl MetalRenderBackend {
         }
     }
 
-    fn create_pipeline_state(&self, shader_source: String) -> Result<metal::RenderPipelineState,String> {
+    fn create_pipeline_state(&self, shader_source: String) -> Result<metal::RenderPipelineState, String> {
         let compile_options = metal::CompileOptions::new();
-        
+
         let vs_source = include_str!("shadertoy_vs.metal");
         let ps_source = shader_source;
 
@@ -171,14 +172,18 @@ impl MetalRenderBackend {
         pipeline_desc.set_vertex_function(Some(&vs));
         pipeline_desc.set_fragment_function(Some(&ps));
         pipeline_desc.set_vertex_descriptor(Some(vertex_desc));
-        pipeline_desc.color_attachments().object_at(0).unwrap().set_pixel_format(metal::MTLPixelFormat::BGRA8Unorm);
+        pipeline_desc
+            .color_attachments()
+            .object_at(0)
+            .unwrap()
+            .set_pixel_format(metal::MTLPixelFormat::BGRA8Unorm);
 
         return self.device.new_render_pipeline_state(&pipeline_desc);
     }
-   
+
 
     fn update_shader(&mut self, shader_source: String) {
-   
+
         if shader_source == self.shader_source {
             return;
         }
@@ -190,7 +195,7 @@ impl MetalRenderBackend {
             Err(string) => {
                 println!("Error creating pipeline state: {}", string);
                 None
-            },
+            }
         }
     }
 }
@@ -241,15 +246,11 @@ impl RenderBackend for MetalRenderBackend {
                     let delta_time = self.time_last_frame.elapsed().as_fractional_secs() as f32;
 
                     let dt: DateTime<Local> = Local::now();
-                    
+
                     ShadertoyConstants {
                         iResolution: (w, h, w / h),
                         pad1: 0.0,
-                        iMouse: (
-                            params.mouse_cursor_pos.0 as f32,
-                            params.mouse_cursor_pos.1 as f32,
-                            0.0,
-                            0.0),
+                        iMouse: (params.mouse_cursor_pos.0 as f32, params.mouse_cursor_pos.1 as f32, 0.0, 0.0),
                         iTime: time,
                         iTimeDelta: delta_time,
                         iFrameRate: 1.0 / delta_time,
@@ -257,11 +258,11 @@ impl RenderBackend for MetalRenderBackend {
                         iFrame: self.frame_index as i32,
                         pad2: [0, 0, 0],
                         iDate: (
-                            dt.year() as f32, 
-                            dt.month() as f32, 
-                            dt.day() as f32, 
-                            dt.second() as f32 // TODO unclear what seconds should be here?
-                        ), 
+                            dt.year() as f32,
+                            dt.month() as f32,
+                            dt.day() as f32,
+                            dt.second() as f32, // TODO unclear what seconds should be here?
+                        ),
                         iChannelTime: [time, time, time, time], // TODO not correct
                         iChannelResolution: [
                             (0.0, 0.0, 0.0, 0.0),
@@ -271,14 +272,17 @@ impl RenderBackend for MetalRenderBackend {
                         ],
                     }
                 };
-                
+
                 let render_pass_descriptor = metal::RenderPassDescriptor::new();
-                let color_attachment = render_pass_descriptor.color_attachments().object_at(0).unwrap();
+                let color_attachment = render_pass_descriptor
+                    .color_attachments()
+                    .object_at(0)
+                    .unwrap();
                 color_attachment.set_texture(Some(drawable.texture()));
                 color_attachment.set_load_action(metal::MTLLoadAction::Clear);
-                color_attachment.set_clear_color(metal::MTLClearColor::new(((self.frame_index%100) as f64) / 100f64, 0.2, 0.2, 1.0));
+                color_attachment.set_clear_color(metal::MTLClearColor::new(((self.frame_index % 100) as f64) / 100f64, 0.2, 0.2, 1.0));
                 color_attachment.set_store_action(metal::MTLStoreAction::Store);
-        
+
                 let command_buffer = self.command_queue.new_command_buffer();
                 let parallel_encoder = command_buffer.new_parallel_render_command_encoder(&render_pass_descriptor);
                 let encoder = parallel_encoder.render_command_encoder();
@@ -301,32 +305,27 @@ impl RenderBackend for MetalRenderBackend {
 
                 self.frame_index += 1;
                 self.time_last_frame = Instant::now();
-            }    
+            }
         }
     }
 }
 
-fn convert_glsl_to_metal(name: &str, entry_point: &str, source: &str) -> Result<String,String> {
+fn convert_glsl_to_metal(name: &str, entry_point: &str, source: &str) -> Result<String, String> {
 
     // convert to SPIR-V using shaderc
 
     let mut compiler = shaderc::Compiler::new().unwrap();
     let options = shaderc::CompileOptions::new().unwrap();
 
-    let binary_result = match compiler.compile_into_spirv(
-        source,
-        shaderc::ShaderKind::Fragment,
-        name,
-        entry_point,
-        Some(&options)) {
+    let binary_result = match compiler.compile_into_spirv(source, shaderc::ShaderKind::Fragment, name, entry_point, Some(&options)) {
 
         Ok(result) => result,
         Err(err) => {
             return Err(format!("shaderc compilation failed: {}", err));
-        },
+        }
     };
 
-/*
+    /*
     let text_result = compiler.compile_into_spirv_assembly(
         source,
         shaderc::ShaderKind::Fragment,
@@ -342,7 +341,7 @@ fn convert_glsl_to_metal(name: &str, entry_point: &str, source: &str) -> Result<
     let module = spirv::Module::from_words(binary_result.as_binary());
 
     let mut ast = spirv::Ast::<msl::Target>::parse(&module).unwrap();
-    
+
     match ast.compile() {
         Ok(str) => Ok(str),
         Err(e) => {
@@ -362,10 +361,10 @@ fn write_file(path: &Path, buf: &[u8]) {
                 Err(why) => println!("couldn't create directory: {:?}", why.kind()),
                 Ok(_) => {}
             }
-        },
+        }
         _ => (),
     }
-    
+
     let mut file = match File::create(&path) {
         Err(why) => panic!("couldn't create {:?}: {}", path, why.description()),
         Ok(file) => file,
@@ -376,39 +375,42 @@ fn write_file(path: &Path, buf: &[u8]) {
 
 fn main() {
     let matches = App::new("Shadertoy Downloader")
-                         .version("0.2")
-                         .author("Johan Andersson <repi@repi.se>")
-                         .about("Downloads shadertoys as json files")
-                         .arg(Arg::with_name("apikey")
-                         	.short("k")
-                         	.long("apikey")
-                         	.value_name("key")
-                            .required(true)
-                         	.help("Set shadertoy API key to use. Create your key on https://www.shadertoy.com/myapps")
-                            .takes_value(true))
-                         .arg(Arg::with_name("search")
-                         	.short("s")
-                         	.long("search")
-                         	.value_name("stringy")
-                         	.help("Search string to filter which shadertoys to get")                         
-                            .takes_value(true))
-                        .arg(Arg::with_name("render")
-                            .short("r")
-                            .long("render")
-                            .help("Render shadertoys in a window, otherwise will just download shadertoys"))
-                         .get_matches();
+        .version("0.2")
+        .author("Johan Andersson <repi@repi.se>")
+        .about("Downloads shadertoys as json files")
+        .arg(
+            Arg::with_name("apikey")
+                .short("k")
+                .long("apikey")
+                .value_name("key")
+                .required(true)
+                .help("Set shadertoy API key to use. Create your key on https://www.shadertoy.com/myapps")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("search")
+                .short("s")
+                .long("search")
+                .value_name("stringy")
+                .help("Search string to filter which shadertoys to get")
+                .takes_value(true),
+        )
+        .arg(Arg::with_name("render").short("r").long("render").help(
+            "Render shadertoys in a window, otherwise will just download shadertoys",
+        ))
+        .get_matches();
 
 
     let api_key = matches.value_of("apikey").unwrap();
 
-    let mut shadertoys: Vec<String> = vec![]; {
+    let mut shadertoys: Vec<String> = vec![];
+    {
 
         let query_str: String = {
             if let Some(search_str) = matches.value_of("search") {
                 format!("https://www.shadertoy.com/api/v1/shaders/query/{}?key={}", search_str, api_key)
-            }
-            else {
-                format!("https://www.shadertoy.com/api/v1/shaders?key={}",api_key)
+            } else {
+                format!("https://www.shadertoy.com/api/v1/shaders?key={}", api_key)
             }
         };
 
@@ -423,12 +425,11 @@ fn main() {
             };
 
             str = String::new();
-            file.read_to_string(&mut str).unwrap();                
-        }
-        else {
+            file.read_to_string(&mut str).unwrap();
+        } else {
             let client = reqwest::Client::new();
             str = client.get(&query_str).send().unwrap().text().unwrap();
-            write_file(&path, str.as_bytes());            
+            write_file(&path, str.as_bytes());
         }
 
         let json = json::parse(&str).unwrap();
@@ -458,7 +459,7 @@ fn main() {
     let mut built_shadertoy_shaders: Vec<String> = vec![];
 
     for shadertoy in shadertoys.iter() {
-//    shadertoys.par_iter().for_each(|shadertoy| {
+        //    shadertoys.par_iter().for_each(|shadertoy| {
 
         index.fetch_add(1, Ordering::SeqCst);
 
@@ -467,28 +468,21 @@ fn main() {
         let mut json_str: String;
 
         if !path.exists() {
-            json_str = client.get(&format!("https://www.shadertoy.com/api/v1/shaders/{}?key={}", shadertoy, api_key)).send().unwrap().text().unwrap();
+            json_str = client
+                .get(&format!("https://www.shadertoy.com/api/v1/shaders/{}?key={}", shadertoy, api_key))
+                .send()
+                .unwrap()
+                .text()
+                .unwrap();
 
-            println!(
-                "shadertoy ({} / {}): {}, json size: {}",
-                index.load(Ordering::SeqCst),
-                shadertoys_len,
-                shadertoy,
-                json_str.len()
-            );
+            println!("shadertoy ({} / {}): {}, json size: {}", index.load(Ordering::SeqCst), shadertoys_len, shadertoy, json_str.len());
 
             let json: shadertoy::Root = serde_json::from_str(&json_str).unwrap();
-            json_str = serde_json::to_string_pretty(&json).unwrap();            
+            json_str = serde_json::to_string_pretty(&json).unwrap();
 
             write_file(&path, json_str.as_bytes());
-        } 
-        else {
-            println!(
-                "shadertoy ({} / {}): {}",
-                index.load(Ordering::SeqCst),
-                shadertoys_len,
-                shadertoy
-            );
+        } else {
+            println!("shadertoy ({} / {}): {}", index.load(Ordering::SeqCst), shadertoys_len, shadertoy);
 
             let mut file = match File::open(&path) {
                 Err(why) => panic!("couldn't open {:?}: {}", path, why.description()),
@@ -528,7 +522,7 @@ fn main() {
                     "musicstream" => "sampler2D",
                     "mic" => "sampler2D",
                     _ => {
-                        panic!("Unknown ctype: {}", input.ctype); 
+                        panic!("Unknown ctype: {}", input.ctype);
                     }
                 };
                 sampler_source.push_str(&format!("uniform {} iChannel{};\n", glsl_type, input.channel));
@@ -541,7 +535,7 @@ fn main() {
             let footer_source = match pass.pass_type.as_str() {
                 "sound" => sound_footer_source,
                 _ => image_footer_source,
-            };            
+            };
 
             // add our header source first which includes shadertoy constant & resource definitions
             let full_source = format!("{}\n{}\n{}\n{}", header_source, sampler_source, pass.code, footer_source);
@@ -554,7 +548,7 @@ fn main() {
                 Ok(full_source_metal) => {
                     // save out the generated Metal file, for debugging
                     let msl_path = PathBuf::from(format!("output/{} {}.metal", shadertoy, pass.name));
-                    write_file(&msl_path, full_source_metal.as_bytes());                
+                    write_file(&msl_path, full_source_metal.as_bytes());
 
                     if pass.pass_type == "image" && pass.inputs.len() == 0 {
                         built_shadertoy_shaders.push(full_source_metal);
@@ -579,16 +573,18 @@ fn main() {
 
                 if !path.exists() {
 
-                    let mut data_response = client.get(&format!("https://www.shadertoy.com/{}", input.src)).send().unwrap();
-                    
+                    let mut data_response = client
+                        .get(&format!("https://www.shadertoy.com/{}", input.src))
+                        .send()
+                        .unwrap();
+
                     let mut data = vec![];
                     data_response.read_to_end(&mut data).unwrap();
 
                     println!("Asset downloaded: {}, {} bytes", input.src, data.len());
 
                     write_file(&path, &data);
-                }
-                else {
+                } else {
 
                     if let Ok(metadata) = path.metadata() {
                         println!("Asset: {}, {} bytes", input.src, metadata.len());
@@ -601,7 +597,7 @@ fn main() {
         if success {
             built_count.fetch_add(1, Ordering::SeqCst);
         }
-//    });
+        //    });
     }
 
     println!("{} / {} shadertoys fully built", built_count.load(Ordering::SeqCst), shadertoys_len);
@@ -618,7 +614,8 @@ fn main() {
         let window = winit::WindowBuilder::new()
             .with_dimensions(1024, 768)
             .with_title("Metal".to_string())
-            .build(&events_loop).unwrap();
+            .build(&events_loop)
+            .unwrap();
 
         let mut render_backend = MetalRenderBackend::new();
         render_backend.init_window(&window);
@@ -628,49 +625,47 @@ fn main() {
         let mut pool = unsafe { NSAutoreleasePool::new(cocoa::base::nil) };
 
         let mut running = true;
-  
+
         let mut cursor_pos = (0.0f64, 0.0f64);
         let mut shadertoy_index = 0usize;
 
         while running {
 
-            events_loop.poll_events(|event| {
-                match event {
-                    winit::Event::WindowEvent{ event: winit::WindowEvent::Closed, .. } => running = false,
-                    winit::Event::WindowEvent{ event: winit::WindowEvent::CursorMoved { position, .. }, .. } => {
-                        cursor_pos = position;
-                    },
-                    winit::Event::WindowEvent{ event: winit::WindowEvent::KeyboardInput { input, .. }, .. } => {
-                        if input.state == winit::ElementState::Pressed {
-                            match input.virtual_keycode {
-                                Some(winit::VirtualKeyCode::Left) => {
-                                    if shadertoy_index != 0 {
-                                        shadertoy_index -= 1;
-                                    }
-                                },
-                                Some(winit::VirtualKeyCode::Right) => {
-                                    if shadertoy_index+1 < built_shadertoy_shaders.len() {
-                                        shadertoy_index += 1;
-                                    }
-                                },
-                                _ => (),
-                            }
-                        }
-                    },
-                    _ => (),
+            events_loop.poll_events(|event| match event {
+                winit::Event::WindowEvent { event: winit::WindowEvent::Closed, .. } => running = false,
+                winit::Event::WindowEvent { event: winit::WindowEvent::CursorMoved { position, .. }, .. } => {
+                    cursor_pos = position;
                 }
+                winit::Event::WindowEvent { event: winit::WindowEvent::KeyboardInput { input, .. }, .. } => {
+                    if input.state == winit::ElementState::Pressed {
+                        match input.virtual_keycode {
+                            Some(winit::VirtualKeyCode::Left) => {
+                                if shadertoy_index != 0 {
+                                    shadertoy_index -= 1;
+                                }
+                            }
+                            Some(winit::VirtualKeyCode::Right) => {
+                                if shadertoy_index + 1 < built_shadertoy_shaders.len() {
+                                    shadertoy_index += 1;
+                                }
+                            }
+                            _ => (),
+                        }
+                    }
+                }
+                _ => (),
             });
 
 
             render_backend.present(RenderParams {
                 mouse_cursor_pos: cursor_pos,
-                shader_source: built_shadertoy_shaders[shadertoy_index].clone()
+                shader_source: built_shadertoy_shaders[shadertoy_index].clone(),
             });
 
-            unsafe { 
+            unsafe {
                 msg_send![pool, release];
                 pool = NSAutoreleasePool::new(cocoa::base::nil);
-            }            
+            }
         }
-    }    
+    }
 }
