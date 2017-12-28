@@ -31,6 +31,7 @@ use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::error::Error;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::thread;
 use rayon::prelude::*;
 use cocoa::foundation::NSAutoreleasePool;
 use std::ffi::CStr;
@@ -189,7 +190,9 @@ impl MetalRenderBackend {
         self.pipeline_state = match self.create_pipeline_state(shader_source) {
             Ok(pipeline_state) => Some(pipeline_state),
             Err(string) => {
-                println!("Error creating pipeline state: {}", string);
+                if self.shader_source.len() > 0 {
+                    println!("Error creating pipeline state: {}", string);
+                }
                 None
             }
         }
@@ -224,10 +227,6 @@ impl RenderBackend for MetalRenderBackend {
     fn present(&mut self, params: RenderParams) {
 
         self.update_shader(params.shader_source);
-
-        if self.pipeline_state.is_none() {
-            return;
-        }
 
         //println!("frame: {}", self.frame_index);
 
@@ -282,17 +281,18 @@ impl RenderBackend for MetalRenderBackend {
                 let command_buffer = self.command_queue.new_command_buffer();
                 let parallel_encoder = command_buffer.new_parallel_render_command_encoder(&render_pass_descriptor);
                 let encoder = parallel_encoder.render_command_encoder();
+                
                 if let Some(ref pipeline_state) = self.pipeline_state {
                     encoder.set_render_pipeline_state(&pipeline_state);
+                    encoder.set_cull_mode(metal::MTLCullMode::None);
+
+                    let constants_ptr: *const ShadertoyConstants = &constants;
+                    let constants_cptr = constants_ptr as *mut libc::c_void;
+                    encoder.set_vertex_bytes(0, std::mem::size_of::<ShadertoyConstants>() as u64, constants_cptr);
+                    encoder.set_fragment_bytes(0, std::mem::size_of::<ShadertoyConstants>() as u64, constants_cptr);
+                    encoder.draw_primitives(metal::MTLPrimitiveType::Triangle, 0, 3);
                 }
-                encoder.set_cull_mode(metal::MTLCullMode::None);
 
-                let constants_ptr: *const ShadertoyConstants = &constants;
-                let constants_cptr = constants_ptr as *mut libc::c_void;
-                encoder.set_vertex_bytes(0, std::mem::size_of::<ShadertoyConstants>() as u64, constants_cptr);
-                encoder.set_fragment_bytes(0, std::mem::size_of::<ShadertoyConstants>() as u64, constants_cptr);
-
-                encoder.draw_primitives(metal::MTLPrimitiveType::Triangle, 0, 3);
                 encoder.end_encoding();
                 parallel_encoder.end_encoding();
 
@@ -320,15 +320,6 @@ fn convert_glsl_to_metal(name: &str, entry_point: &str, source: &str) -> Result<
             return Err(format!("shaderc compilation failed: {}", err));
         }
     };
-
-    /*
-    let text_result = compiler.compile_into_spirv_assembly(
-        source,
-        shaderc::ShaderKind::Fragment,
-        name,
-        entry_point,
-        Some(&options))?;
-*/
 
     // convert SPIR-V to MSL
 
@@ -369,42 +360,13 @@ fn write_file(path: &Path, buf: &[u8]) {
     file.write_all(buf).unwrap();
 }
 
-
-fn main() {
-    let matches = App::new("Shadertoy Downloader")
-        .version("0.2")
-        .author("Johan Andersson <repi@repi.se>")
-        .about("Downloads shadertoys as json files")
-        .arg(
-            Arg::with_name("apikey")
-                .short("k")
-                .long("apikey")
-                .value_name("key")
-                .required(true)
-                .help("Set shadertoy API key to use. Create your key on https://www.shadertoy.com/myapps")
-                .takes_value(true),
-        )
-        .arg(
-            Arg::with_name("search")
-                .short("s")
-                .long("search")
-                .value_name("stringy")
-                .help("Search string to filter which shadertoys to get")
-                .takes_value(true),
-        )
-        .arg(Arg::with_name("render").short("r").long("render").help(
-            "Render shadertoys in a window, otherwise will just download shadertoys",
-        ))
-        .get_matches();
-
-
-    let api_key = matches.value_of("apikey").unwrap();
+fn query(api_key: &str, search_str: Option<&str>, sender: std::sync::mpsc::Sender<String>) {
 
     let mut shadertoys: Vec<String> = vec![];
+   
     {
-
         let query_str: String = {
-            if let Some(search_str) = matches.value_of("search") {
+            if let Some(search_str) = search_str {
                 format!("https://www.shadertoy.com/api/v1/shaders/query/{}?key={}", search_str, api_key)
             } else {
                 format!("https://www.shadertoy.com/api/v1/shaders?key={}", api_key)
@@ -452,8 +414,6 @@ fn main() {
 
     let client = reqwest::Client::new();
 
-
-    let mut built_shadertoy_shaders: Vec<String> = vec![];
 
     for shadertoy in shadertoys.iter() {
         //    shadertoys.par_iter().for_each(|shadertoy| {
@@ -548,7 +508,8 @@ fn main() {
                     write_file(&msl_path, full_source_metal.as_bytes());
 
                     if pass.pass_type == "image" && pass.inputs.len() == 0 {
-                        built_shadertoy_shaders.push(full_source_metal);
+                        // sent built shader
+                        sender.send(full_source_metal).unwrap();
                     }
                 }
                 Err(string) => {
@@ -598,12 +559,24 @@ fn main() {
     }
 
     println!("{} / {} shadertoys fully built", built_count.load(Ordering::SeqCst), shadertoys_len);
+}
 
+fn run(matches: &clap::ArgMatches) {
+    let (sender, receiver) = std::sync::mpsc::channel::<String>();
 
+    let api_key = matches.value_of("apikey").unwrap();
+    let search_str = matches.value_of("search");
 
-    if built_shadertoy_shaders.len() == 0 {
-        return;
-    }
+    query(api_key, search_str, sender.clone());
+
+/*
+    thread::spawn(move || {
+
+        //query(api_key, search_str, sender.clone());
+        query("rdHtWz", Some("party"), sender.clone());
+        //query(api_key_ref, Some("test"), sender.clone());
+    });
+*/
 
     if matches.is_present("render") {
 
@@ -618,15 +591,21 @@ fn main() {
         render_backend.init_window(&window);
 
 
-
         let mut pool = unsafe { NSAutoreleasePool::new(cocoa::base::nil) };
 
         let mut running = true;
 
         let mut cursor_pos = (0.0f64, 0.0f64);
+
         let mut shadertoy_index = 0usize;
+        let mut built_shadertoy_shaders: Vec<String> = Vec::new(); 
 
         while running {
+
+
+            while let Ok(shader_source) = receiver.try_recv() {
+                built_shadertoy_shaders.push(shader_source);
+            }
 
             events_loop.poll_events(|event| match event {
                 winit::Event::WindowEvent { event: winit::WindowEvent::Closed, .. } => running = false,
@@ -656,7 +635,13 @@ fn main() {
 
             render_backend.present(RenderParams {
                 mouse_cursor_pos: cursor_pos,
-                shader_source: built_shadertoy_shaders[shadertoy_index].clone(),
+                shader_source: {
+                    if let Some(shader_source) = built_shadertoy_shaders.get(shadertoy_index) {
+                        shader_source.clone()
+                    } else {
+                        String::new() // empty string
+                    }
+                }
             });
 
             unsafe {
@@ -664,5 +649,35 @@ fn main() {
                 pool = NSAutoreleasePool::new(cocoa::base::nil);
             }
         }
-    }
+    }    
+}
+
+fn main() {
+    let matches = App::new("Shadertoy Downloader")
+        .version("0.2")
+        .author("Johan Andersson <repi@repi.se>")
+        .about("Downloads shadertoys as json files")
+        .arg(
+            Arg::with_name("apikey")
+                .short("k")
+                .long("apikey")
+                .value_name("key")
+                .required(true)
+                .help("Set shadertoy API key to use. Create your key on https://www.shadertoy.com/myapps")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("search")
+                .short("s")
+                .long("search")
+                .value_name("stringy")
+                .help("Search string to filter which shadertoys to get")
+                .takes_value(true),
+        )
+        .arg(Arg::with_name("render").short("r").long("render").help(
+            "Render shadertoys in a window, otherwise will just download shadertoys",
+        ))
+        .get_matches();
+
+    run(&matches);
 }
