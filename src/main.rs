@@ -16,17 +16,13 @@ extern crate cocoa;
 extern crate objc;
 extern crate objc_foundation;
 
-#[macro_use]
-extern crate serde_derive;
-extern crate serde;
 extern crate serde_json;
 
 extern crate libc;
 extern crate foreign_types;
 extern crate metal_rs as metal;
 
-
-mod shadertoy;
+extern crate shadertoy;
 
 use clap::{Arg, App};
 use std::io::Write;
@@ -372,6 +368,7 @@ fn write_file(path: &Path, buf: &[u8]) {
 
     file.write_all(buf).unwrap();
 }
+
 
 fn main() {
     let matches = App::new("Shadertoy Downloader")

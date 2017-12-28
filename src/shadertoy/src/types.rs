@@ -1,4 +1,4 @@
-#[warn(dead_code)]
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Root {
     #[serde(rename = "Shader")]
