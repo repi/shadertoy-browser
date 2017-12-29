@@ -243,7 +243,7 @@ impl RenderBackend for MetalRenderBackend {
                     .unwrap();
                 color_attachment.set_texture(Some(drawable.texture()));
                 color_attachment.set_load_action(metal::MTLLoadAction::Clear);
-                color_attachment.set_clear_color(metal::MTLClearColor::new(((self.frame_index % 100) as f64) / 100f64, 0.2, 0.2, 1.0));
+                color_attachment.set_clear_color(metal::MTLClearColor::new(1.0, 0.0, 0.0, 1.0));
                 color_attachment.set_store_action(metal::MTLStoreAction::Store);
 
                 let command_buffer = self.command_queue.new_command_buffer();
