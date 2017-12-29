@@ -76,6 +76,8 @@ struct ShadertoyConstants {
     iChannelTime: [f32; 4],
     /// Input texture resolution for each channel
     iChannelResolution: [(f32, f32, f32, f32); 4],
+    iBlockOffset: f32,
+    pad3: [f32; 3],
 }
 
 pub struct RenderParams {
@@ -233,6 +235,8 @@ impl RenderBackend for MetalRenderBackend {
                             (0.0, 0.0, 0.0, 0.0),
                             (0.0, 0.0, 0.0, 0.0),
                         ],
+                        iBlockOffset: 0.0,
+                        pad3: [0.0, 0.0, 0.0],
                     }
                 };
 
