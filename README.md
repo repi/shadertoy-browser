@@ -8,6 +8,18 @@ This application uses the [Shadertoy API](http://shadertoy.com/api) to search fo
 
 TODO
 
+## Building
+
+First make sure you have [Rust](https://www.rust-lang.org/en-US/install.html) installed.
+Then building is easy:
+
+```
+$ git clone https://github.com/repi/shadertoy-browser
+$ cd shadertoy-browser
+$ cargo build --release
+$ ./target/release/shadertoy-browser
+```
+
 ## License
 
 Licensed under either of the following, at your option:
