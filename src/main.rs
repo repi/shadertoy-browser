@@ -655,7 +655,7 @@ fn main() {
                 .short("k")
                 .long("apikey")
                 .value_name("key")
-                .required(true)
+                .default_value("BtHtWD") // be nice and have a default key so app just works
                 .help("Set shadertoy API key to use. Create your key on https://www.shadertoy.com/myapps")
                 .takes_value(true),
         )
