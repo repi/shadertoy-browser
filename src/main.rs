@@ -50,7 +50,6 @@ use floating_duration::TimeAsFloat;
 use chrono::prelude::*;
 use base58::ToBase58;
 
-
 #[allow(non_snake_case)]
 struct ShadertoyConstants {
     // The viewport resolution (z is pixel aspect ratio, usually 1.0).
@@ -100,38 +99,6 @@ struct MetalRenderBackend {
     pipeline_state: Option<metal::RenderPipelineState>,
 }
 
-#[allow(non_snake_case)]
-fn TEST_new_library_with_source(device: &metal::Device, src: &str, options: &metal::CompileOptionsRef) -> Result<metal::Library, String> {
-    use cocoa::foundation::NSString as cocoa_NSString;
-    use cocoa::base::nil as cocoa_nil;
-
-    unsafe {
-        let source = cocoa_NSString::alloc(cocoa_nil).init_str(src);
-
-        let mut err: *mut ::objc::runtime::Object = ::std::ptr::null_mut();
-
-        let library: *mut metal::MTLLibrary = {
-            msg_send![*device, newLibraryWithSource:source
-                                        options:options
-                                        error:&mut err]
-        };
-
-        if !library.is_null() {
-            return Result::Ok(metal::Library::from_ptr(library));
-        }
-
-        if !err.is_null() {
-            let desc: *mut Object = msg_send![err, localizedDescription];
-            let compile_error: *const ::libc::c_char = msg_send![desc, UTF8String];
-            let message = CStr::from_ptr(compile_error).to_string_lossy().into_owned();
-            msg_send![err, release];
-            return Err(message);
-        }
-
-        return Err(String::from("unreachable?"));
-    }
-}
-
 
 impl MetalRenderBackend {
     fn new() -> MetalRenderBackend {
@@ -157,8 +124,8 @@ impl MetalRenderBackend {
         let vs_source = include_str!("shadertoy_vs.metal");
         let ps_source = shader_source;
 
-        let vs_library = TEST_new_library_with_source(&self.device, vs_source, &compile_options)?;
-        let ps_library = TEST_new_library_with_source(&self.device, &ps_source, &compile_options)?;
+        let vs_library = new_library_with_source(&self.device, vs_source, &compile_options)?;
+        let ps_library = new_library_with_source(&self.device, &ps_source, &compile_options)?;
 
         let vs = vs_library.get_function("vsMain", None)?;
         let ps = ps_library.get_function("main0", None)?;
@@ -177,7 +144,6 @@ impl MetalRenderBackend {
 
         return self.device.new_render_pipeline_state(&pipeline_desc);
     }
-
 
     fn update_shader(&mut self, shader_source: String) {
 
@@ -303,6 +269,40 @@ impl RenderBackend for MetalRenderBackend {
                 self.time_last_frame = Instant::now();
             }
         }
+    }
+}
+
+// manually created version as the one in metal-rs will fail and return Err 
+// for shaders that just have compilation warnings
+// TODO should figure out how to resolve this properly and merge it back?
+fn new_library_with_source(device: &metal::Device, src: &str, options: &metal::CompileOptionsRef) -> Result<metal::Library, String> {
+    use cocoa::foundation::NSString as cocoa_NSString;
+    use cocoa::base::nil as cocoa_nil;
+
+    unsafe {
+        let source = cocoa_NSString::alloc(cocoa_nil).init_str(src);
+
+        let mut err: *mut ::objc::runtime::Object = ::std::ptr::null_mut();
+
+        let library: *mut metal::MTLLibrary = {
+            msg_send![*device, newLibraryWithSource:source
+                                        options:options
+                                        error:&mut err]
+        };
+
+        if !library.is_null() {
+            return Result::Ok(metal::Library::from_ptr(library));
+        }
+
+        if !err.is_null() {
+            let desc: *mut Object = msg_send![err, localizedDescription];
+            let compile_error: *const ::libc::c_char = msg_send![desc, UTF8String];
+            let message = CStr::from_ptr(compile_error).to_string_lossy().into_owned();
+            msg_send![err, release];
+            return Err(message);
+        }
+
+        return Err(String::from("unreachable?"));
     }
 }
 
@@ -569,16 +569,7 @@ fn run(matches: &clap::ArgMatches) {
 
     query(api_key, search_str, sender.clone());
 
-/*
-    thread::spawn(move || {
-
-        //query(api_key, search_str, sender.clone());
-        query("rdHtWz", Some("party"), sender.clone());
-        //query(api_key_ref, Some("test"), sender.clone());
-    });
-*/
-
-    if matches.is_present("render") {
+    if !matches.is_present("headless") {
 
         let mut events_loop = winit::EventsLoop::new();
         let window = winit::WindowBuilder::new()
@@ -674,8 +665,11 @@ fn main() {
                 .help("Search string to filter which shadertoys to get")
                 .takes_value(true),
         )
-        .arg(Arg::with_name("render").short("r").long("render").help(
-            "Render shadertoys in a window, otherwise will just download shadertoys",
+        .arg(
+            Arg::with_name("headless")
+                .short("h")
+                .long("headless")
+                .help("Don't render, only download shadertoys",
         ))
         .get_matches();
 
