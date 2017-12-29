@@ -1,5 +1,8 @@
 #![allow(dead_code)]
 
+#[macro_use]
+extern crate clap;
+
 extern crate reqwest;
 extern crate json;
 extern crate floating_duration;
@@ -7,7 +10,6 @@ extern crate chrono;
 extern crate rayon;
 extern crate shaderc;
 extern crate spirv_cross;
-extern crate clap;
 extern crate winit;
 extern crate rust_base58 as base58;
 
@@ -644,8 +646,8 @@ fn run(matches: &clap::ArgMatches) {
 }
 
 fn main() {
-    let matches = App::new("Shadertoy Downloader")
-        .version("0.2")
+    let matches = App::new("Shadertoy Browser")
+        .version(crate_version!())
         .author("Johan Andersson <repi@repi.se>")
         .about("Downloads shadertoys as json files")
         .arg(
