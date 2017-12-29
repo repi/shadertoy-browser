@@ -292,6 +292,8 @@ fn new_library_with_source(device: &metal::Device, src: &str, options: &metal::C
                                         error:&mut err]
         };
 
+        // TODO right now we just return Ok if a library is built, and ignore the warnings
+        // would be ideal to be able to report out warnings even for successful builds though
         if !library.is_null() {
             return Result::Ok(metal::Library::from_ptr(library));
         }
