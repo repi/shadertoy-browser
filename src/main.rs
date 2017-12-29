@@ -300,7 +300,8 @@ fn new_library_with_source(device: &metal::Device, src: &str, options: &metal::C
             let desc: *mut Object = msg_send![err, localizedDescription];
             let compile_error: *const ::libc::c_char = msg_send![desc, UTF8String];
             let message = CStr::from_ptr(compile_error).to_string_lossy().into_owned();
-            msg_send![err, release];
+            // original code crashes due to this release when having error message
+            //msg_send![err, release]; 
             return Err(message);
         }
 
