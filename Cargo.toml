@@ -1,6 +1,6 @@
 [package]
-name = "shadertoy_viewer"
-version = "0.1.0"
+name = "shadertoy-browser"
+version = "0.2.0"
 authors = ["Johan Andersson <repi@repi.se>"]
 repository = "https://github.com/repi/shadertoy_viewer"
 readme = "README.md"
