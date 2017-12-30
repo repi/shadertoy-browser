@@ -146,7 +146,8 @@ impl MetalRenderBackend {
             .unwrap()
             .set_pixel_format(metal::MTLPixelFormat::BGRA8Unorm);
 
-        return self.device.new_render_pipeline_state(&pipeline_desc);
+        //return self.device.new_render_pipeline_state(&pipeline_desc);
+        return new_render_pipeline_state(&self.device, &pipeline_desc);
     }
 
     fn update_shader(&mut self, shader_source: String) {
@@ -312,6 +313,45 @@ fn new_library_with_source(device: &metal::Device, src: &str, options: &metal::C
         }
 
         return Err(String::from("unreachable?"));
+    }
+}
+
+macro_rules! try_objc {
+    {
+        $err_name: ident => $body:expr
+    } => {
+        {
+            let mut $err_name: *mut ::objc::runtime::Object = ::std::ptr::null_mut();
+            let value = $body;
+            if !$err_name.is_null() {
+                let desc: *mut Object = msg_send![$err_name, localizedDescription];
+                let compile_error: *const ::libc::c_char = msg_send![desc, UTF8String];
+                let message = CStr::from_ptr(compile_error).to_string_lossy().into_owned();
+                //msg_send![$err_name, release];
+                return Err(String::from("error apa"));
+            }
+            value
+        }
+    };
+}
+
+// manually created version as the one in metal-rs will return Ok even if 
+// a null pipeline state is returnedfail and return Err 
+// TODO should merge this back 
+pub fn new_render_pipeline_state(device: &metal::Device, descriptor: &metal::RenderPipelineDescriptorRef) -> Result<metal::RenderPipelineState, String> {
+    unsafe {
+        let pipeline_state: *mut metal::MTLRenderPipelineState = try_objc!{ err =>
+            msg_send![*device, newRenderPipelineStateWithDescriptor:descriptor
+                                                            error:&mut err]
+        };
+
+        // This is the check that is new here
+        // apparently there are cases where an error message is not returned but null is
+        if pipeline_state.is_null() {
+            return Err(String::from("newRenderPipelineStateWithDescriptor returned null"));
+        }
+
+        Ok(metal::RenderPipelineState::from_ptr(pipeline_state))
     }
 }
 
