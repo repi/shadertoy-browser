@@ -263,8 +263,9 @@ macro_rules! try_objc {
                 let desc: *mut Object = msg_send![$err_name, localizedDescription];
                 let compile_error: *const libc::c_char = msg_send![desc, UTF8String];
                 let message = CStr::from_ptr(compile_error).to_string_lossy().into_owned();
+                // original code crashes due to this release when having error message
                 //msg_send![$err_name, release];
-                return Err(String::from("error apa"));
+                return Err(message);
             }
             value
         }
@@ -274,7 +275,7 @@ macro_rules! try_objc {
 // manually created version as the one in metal-rs will return Ok even if
 // a null pipeline state is returnedfail and return Err
 // TODO should merge this back
-pub fn new_render_pipeline_state(
+fn new_render_pipeline_state(
     device: &metal::Device,
     descriptor: &metal::RenderPipelineDescriptorRef,
 ) -> Result<metal::RenderPipelineState, String> {
