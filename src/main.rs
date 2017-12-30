@@ -17,7 +17,7 @@ extern crate reqwest;
 extern crate json;
 
 // TODO move this to render_metal
-extern crate cocoa; 
+extern crate cocoa;
 #[macro_use]
 extern crate objc;
 
@@ -63,7 +63,7 @@ fn write_file(path: &Path, buf: &[u8]) {
 fn query(api_key: &str, search_str: Option<&str>, sender: std::sync::mpsc::Sender<String>) {
 
     let mut shadertoys: Vec<String> = vec![];
-   
+
     {
         let query_str: String = {
             if let Some(search_str) = search_str {
@@ -289,7 +289,7 @@ fn run(matches: &clap::ArgMatches) {
         let mut cursor_pos = (0.0f64, 0.0f64);
 
         let mut shadertoy_index = 0usize;
-        let mut built_shadertoy_shaders: Vec<String> = Vec::new(); 
+        let mut built_shadertoy_shaders: Vec<String> = Vec::new();
 
         while running {
 
@@ -332,7 +332,7 @@ fn run(matches: &clap::ArgMatches) {
                     } else {
                         String::new() // empty string
                     }
-                }
+                },
             });
 
             unsafe {
@@ -340,7 +340,7 @@ fn run(matches: &clap::ArgMatches) {
                 pool = NSAutoreleasePool::new(cocoa::base::nil);
             }
         }
-    }    
+    }
 }
 
 fn main() {
@@ -369,8 +369,8 @@ fn main() {
             Arg::with_name("headless")
                 .short("h")
                 .long("headless")
-                .help("Don't render, only download shadertoys",
-        ))
+                .help("Don't render, only download shadertoys"),
+        )
         .get_matches();
 
     run(&matches);

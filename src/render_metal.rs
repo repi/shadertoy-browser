@@ -190,7 +190,7 @@ impl RenderBackend for MetalRenderBackend {
                 let command_buffer = self.command_queue.new_command_buffer();
                 let parallel_encoder = command_buffer.new_parallel_render_command_encoder(&render_pass_descriptor);
                 let encoder = parallel_encoder.render_command_encoder();
-                
+
                 if let Some(ref pipeline_state) = self.pipeline_state {
                     encoder.set_render_pipeline_state(&pipeline_state);
                     encoder.set_cull_mode(metal::MTLCullMode::None);
@@ -215,7 +215,7 @@ impl RenderBackend for MetalRenderBackend {
     }
 }
 
-// manually created version as the one in metal-rs will fail and return Err 
+// manually created version as the one in metal-rs will fail and return Err
 // for shaders that just have compilation warnings
 // TODO should figure out how to resolve this properly and merge it back?
 fn new_library_with_source(device: &metal::Device, src: &str, options: &metal::CompileOptionsRef) -> Result<metal::Library, String> {
@@ -244,7 +244,7 @@ fn new_library_with_source(device: &metal::Device, src: &str, options: &metal::C
             let compile_error: *const libc::c_char = msg_send![desc, UTF8String];
             let message = CStr::from_ptr(compile_error).to_string_lossy().into_owned();
             // original code crashes due to this release when having error message
-            //msg_send![err, release]; 
+            //msg_send![err, release];
             return Err(message);
         }
 
@@ -271,12 +271,16 @@ macro_rules! try_objc {
     };
 }
 
-// manually created version as the one in metal-rs will return Ok even if 
-// a null pipeline state is returnedfail and return Err 
-// TODO should merge this back 
-pub fn new_render_pipeline_state(device: &metal::Device, descriptor: &metal::RenderPipelineDescriptorRef) -> Result<metal::RenderPipelineState, String> {
+// manually created version as the one in metal-rs will return Ok even if
+// a null pipeline state is returnedfail and return Err
+// TODO should merge this back
+pub fn new_render_pipeline_state(
+    device: &metal::Device,
+    descriptor: &metal::RenderPipelineDescriptorRef,
+) -> Result<metal::RenderPipelineState, String> {
     unsafe {
-        let pipeline_state: *mut metal::MTLRenderPipelineState = try_objc!{ err =>
+        let pipeline_state: *mut metal::MTLRenderPipelineState =
+            try_objc!{ err =>
             msg_send![*device, newRenderPipelineStateWithDescriptor:descriptor
                                                             error:&mut err]
         };
