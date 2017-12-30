@@ -58,14 +58,14 @@ impl MetalRenderBackend {
         }
     }
 
-    fn create_pipeline_state(&self, shader_source: String) -> Result<metal::RenderPipelineState, String> {
+    fn create_pipeline_state(&self, shader_source: &str) -> Result<metal::RenderPipelineState, String> {
         let compile_options = metal::CompileOptions::new();
 
         let vs_source = include_str!("shadertoy_vs.metal");
         let ps_source = shader_source;
 
         let vs_library = new_library_with_source(&self.device, vs_source, &compile_options)?;
-        let ps_library = new_library_with_source(&self.device, &ps_source, &compile_options)?;
+        let ps_library = new_library_with_source(&self.device, ps_source, &compile_options)?;
 
         let vs = vs_library.get_function("vsMain", None)?;
         let ps = ps_library.get_function("main0", None)?;
@@ -86,13 +86,13 @@ impl MetalRenderBackend {
         return new_render_pipeline_state(&self.device, &pipeline_desc);
     }
 
-    fn update_shader(&mut self, shader_source: String) {
+    fn update_shader(&mut self, shader_source: &str) {
 
         if shader_source == self.shader_source {
             return;
         }
 
-        self.shader_source = shader_source.clone();
+        self.shader_source = shader_source.to_string();
 
         self.pipeline_state = match self.create_pipeline_state(shader_source) {
             Ok(pipeline_state) => Some(pipeline_state),
@@ -133,7 +133,7 @@ impl RenderBackend for MetalRenderBackend {
 
     fn present(&mut self, params: RenderParams) {
 
-        self.update_shader(params.shader_source);
+        self.update_shader(&params.shader_source);
 
         //println!("frame: {}", self.frame_index);
 

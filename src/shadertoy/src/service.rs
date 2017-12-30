@@ -9,9 +9,9 @@ pub struct Service {
 }
 
 impl Service {
-    fn new(api_key: String) -> Service {
+    fn new(api_key: &str) -> Service {
         Service {
-            api_key,
+            api_key: api_key.to_string(),
             client: reqwest::Client::new(),
         }
     }
