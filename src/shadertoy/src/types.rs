@@ -1,3 +1,8 @@
+#[derive(Serialize, Deserialize, Debug)]
+pub struct SearchResult {
+    #[serde(rename = "Results")]
+    pub results: Vec<String>,
+}
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Root {

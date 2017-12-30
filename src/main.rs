@@ -14,7 +14,6 @@ extern crate rust_base58 as base58;
 // TODO move this to shadertoy
 extern crate serde_json;
 extern crate reqwest;
-extern crate json;
 
 // TODO move this to render_metal
 extern crate cocoa;
@@ -60,45 +59,63 @@ fn write_file(path: &Path, buf: &[u8]) {
     file.write_all(buf).unwrap();
 }
 
-fn query(api_key: &str, search_str: Option<&str>, sender: std::sync::mpsc::Sender<String>) {
+fn search(api_key: &str, search_str: Option<&str>) -> Vec<String> {
 
-    let mut shadertoys: Vec<String> = vec![];
+    let query_str: String = {
+        if let Some(search_str) = search_str {
+            format!("https://www.shadertoy.com/api/v1/shaders/query/{}?key={}", search_str, api_key)
+        } else {
+            format!("https://www.shadertoy.com/api/v1/shaders?key={}", api_key)
+        }
+    };
 
-    {
-        let query_str: String = {
-            if let Some(search_str) = search_str {
-                format!("https://www.shadertoy.com/api/v1/shaders/query/{}?key={}", search_str, api_key)
-            } else {
-                format!("https://www.shadertoy.com/api/v1/shaders?key={}", api_key)
-            }
+    let path = PathBuf::from(&format!("output/query/{}", query_str.as_bytes().to_base58()));
+
+    let mut json_str;
+
+    if path.exists() {
+        let mut file = match File::open(&path) {
+            Err(why) => panic!("couldn't open {:?}: {}", path, why.description()),
+            Ok(file) => file,
         };
 
-        let path = PathBuf::from(&format!("output/query/{}", query_str.as_bytes().to_base58()));
-
-        let mut str;
-
-        if path.exists() {
-            let mut file = match File::open(&path) {
-                Err(why) => panic!("couldn't open {:?}: {}", path, why.description()),
-                Ok(file) => file,
-            };
-
-            str = String::new();
-            file.read_to_string(&mut str).unwrap();
-        } else {
-            let client = reqwest::Client::new();
-            str = client.get(&query_str).send().unwrap().text().unwrap();
-            write_file(&path, str.as_bytes());
-        }
-
-        let json = json::parse(&str).unwrap();
-
-        for v in json["Results"].members() {
-            if let Some(shadertoy) = v.as_str() {
-                shadertoys.push(String::from(shadertoy));
-            }
-        }
+        json_str = String::new();
+        file.read_to_string(&mut json_str).unwrap();
+    } else {
+        let client = reqwest::Client::new();
+        json_str = client.get(&query_str).send().unwrap().text().unwrap();
+        write_file(&path, json_str.as_bytes());
     }
+
+    let mut shadertoys: Vec<String> = vec![];
+/*
+    let json_result: serde_json::Result<serde_json::Value> = serde_json::from_str(&json_str);
+
+    match json_result {
+        Ok(json) => {
+            let test = &json["Results"];
+            for v in test.as_array().unwrap().iter() {
+                if let Some(shadertoy) = v.as_str() {
+                    shadertoys.push(String::from(shadertoy));
+                }
+            }
+        },
+        Err(_str) => (),
+    }
+*/
+
+    let search_result: serde_json::Result<shadertoy::SearchResult> = serde_json::from_str(&json_str);
+
+    if let Ok(r) = search_result {
+        shadertoys = r.results;
+    }
+
+    shadertoys
+}
+
+fn query(api_key: &str, search_str: Option<&str>, sender: std::sync::mpsc::Sender<String>) {
+
+    let shadertoys = search(api_key, search_str);
 
     let shadertoys_len = shadertoys.len();
 
