@@ -9,6 +9,9 @@ keywords = ["shaders", "shadertoy", "render", "mac", "metal"]
 categories = ["rendering"]
 workspace = "../.."
 
+[badges]
+travis-ci = { repository = "repi/shadertoy-browser" }
+
 [dependencies]
 reqwest = "0.8.2"
 serde = "1.0.26"
