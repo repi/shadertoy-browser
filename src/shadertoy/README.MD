@@ -1,10 +1,18 @@
-# Rust Shadertoy API
+# Shadertoy API
 
-[![Build Status](https://travis-ci.com/repi/shadertoy-browser.svg?token=8SzG1tHkq3FpBRftmohU&branch=master)](https://travis-ci.com/repi/shadertoy-browser) ![MIT/Apache](https://img.shields.io/badge/license-MIT%2FApache-blue.svg)
+[![Crate](https://img.shields.io/crates/v/shadertoy.svg)](https://crates.io/crates/shadertoy)
+[![Docs.rs](https://docs.rs/shadertoy/badge.svg)](https://docs.rs/shadertoy)
+[![Build Status](https://travis-ci.com/repi/shadertoy-browser.svg?token=8SzG1tHkq3FpBRftmohU&branch=master)](https://travis-ci.com/repi/shadertoy-browser)
+![MIT/Apache](https://img.shields.io/badge/license-MIT%2FApache-blue.svg)
 
 Rust library wrapping the [Shadertoy REST API](http://shadertoy.com/api) to be able to easily search through and download Shadertoy assets.
 
 ## Usage
+
+```toml
+[dependencies]
+shadertoy = "0.1"
+```
 
 TODO
 
