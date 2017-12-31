@@ -6,12 +6,15 @@ extern crate serde_json;
 use std;
 use types::*;
 
+/// Client for issuing queries against the Shadertoy API and database
 pub struct Client {
     api_key: String,
     client: reqwest::Client,
 }
 
 impl Client {
+    /// Create a new client.
+    /// This requires sending in an API key, one can generate one on https://www.shadertoy.com/profile
     pub fn new(api_key: &str) -> Client {
         Client {
             api_key: api_key.to_string(),
@@ -19,6 +22,7 @@ impl Client {
         }
     }
 
+    /// Issues a search query for shadertoys.
     pub fn search(&self, search_str: Option<&str>) -> Result<Vec<String>, Box<std::error::Error>> {
 
         let query_str: String = {
