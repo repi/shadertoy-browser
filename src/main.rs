@@ -61,32 +61,32 @@ fn write_file(path: &Path, buf: &[u8]) {
 
 fn search(api_key: &str, search_str: Option<&str>) -> Result<Vec<String>, Box<std::error::Error>> {
 
-    let query_str: String = {
-        if let Some(search_str) = search_str {
-            format!("https://www.shadertoy.com/api/v1/shaders/query/{}?key={}", search_str, api_key)
-        } else {
-            format!("https://www.shadertoy.com/api/v1/shaders?key={}", api_key)
-        }
-    };
+    // check if we can find a cached search on disk
 
-    let path = PathBuf::from(&format!("output/query/{}", query_str.as_bytes().to_base58()));
-
-    let mut json_str;
+    let path = PathBuf::from(&format!("output/query/{}", match search_str {
+        Some(str) => str.as_bytes().to_base58(),
+        None => "all".to_string(),
+    }));
 
     if let Ok(mut file) = File::open(&path) {
-        json_str = String::new();
+        let mut json_str = String::new();
         file.read_to_string(&mut json_str)?;
+        let search_result: serde_json::Result<shadertoy::SearchResult> = serde_json::from_str(&json_str);
+        match search_result {
+            Ok(r) => Ok(r.results),
+            Err(err) => Err(Box::new(err)),
+        }        
     } else {
-        let client = reqwest::Client::new();
-        json_str = client.get(&query_str).send()?.text()?;
-        write_file(&path, json_str.as_bytes());
-    }
-
-    let search_result: serde_json::Result<shadertoy::SearchResult> = serde_json::from_str(&json_str);
-
-    match search_result {
-        Ok(r) => Ok(r.results),
-        Err(err) => Err(Box::new(err)),
+        // issue the actual request
+        let service = shadertoy::Service::new(api_key);
+        match service.search(search_str) {
+            Ok(result) => {
+                // cache search results to a file on disk
+                write_file(&path, serde_json::to_string(&result)?.as_bytes());
+                Ok(result)
+            }
+            Err(err) => Err(err)
+        }
     }
 }
 

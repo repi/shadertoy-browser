@@ -1,6 +1,6 @@
 [package]
 name = "shadertoy-browser"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["Johan Andersson <repi@repi.se>"]
 repository = "https://github.com/repi/shadertoy_viewer"
 readme = "README.md"
@@ -27,4 +27,4 @@ libc = "0.2.34"
 foreign-types = "0.3.2"
 metal-rs = { git = "https://github.com/repi/metal-rs", branch = "border-color" }
 rust-base58 = "0.0.4"
-shadertoy = { path = "src/shadertoy", version = "0.1.0" }
+shadertoy = { path = "src/shadertoy", version = "0.1.1" }
