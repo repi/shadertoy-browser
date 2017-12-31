@@ -8,7 +8,7 @@ pub struct SearchResult {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct Root {
+pub struct ShaderRoot {
     #[serde(rename = "Shader")]
     pub shader: Shader,
 }

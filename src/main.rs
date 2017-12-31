@@ -132,7 +132,7 @@ fn query(api_key: &str, search_str: Option<&str>, sender: std::sync::mpsc::Sende
 
             println!("shadertoy ({} / {}): {}, json size: {}", index.load(Ordering::SeqCst), shadertoys_len, shadertoy, json_str.len());
 
-            let json: shadertoy::Root = serde_json::from_str(&json_str)?;
+            let json: shadertoy::ShaderRoot = serde_json::from_str(&json_str)?;
             json_str = serde_json::to_string_pretty(&json)?;
             write_file(&path, json_str.as_bytes());
         } else {
@@ -143,7 +143,7 @@ fn query(api_key: &str, search_str: Option<&str>, sender: std::sync::mpsc::Sende
             file.read_to_string(&mut json_str)?;
         }
 
-        let root: shadertoy::Root = serde_json::from_str(&json_str)?;
+        let root: shadertoy::ShaderRoot = serde_json::from_str(&json_str)?;
 
         let mut success = true;
 
