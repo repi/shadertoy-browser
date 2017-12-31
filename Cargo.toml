@@ -28,6 +28,6 @@ objc-foundation = "0.1.1"
 objc = "0.2.2"
 libc = "0.2.34"
 foreign-types = "0.3.2"
-metal-rs = { git = "https://github.com/repi/metal-rs", branch = "border-color" }
+metal-rs = { git = "https://github.com/gfx-rs/metal-rs.git", branch = "master" }
 rust-base58 = "0.0.4"
 shadertoy = { path = "src/shadertoy", version = "0.1.1" }
