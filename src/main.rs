@@ -38,6 +38,7 @@ mod render_metal;
 #[cfg(target_os="macos")]
 use render_metal::*;
 #[cfg(target_os="macos")]
+#[macro_use]
 extern crate objc;
 #[cfg(target_os="macos")]
 extern crate cocoa;
@@ -275,11 +276,11 @@ fn run(matches: &clap::ArgMatches) {
 
         #[cfg(target_os="macos")]
         {
-            render.backend = Box::new(MetalRenderBackend::new());
-            render_backend.init_window(&window);
+            render_backend = Some(Box::new(MetalRenderBackend::new()));
         }
 
         let mut render_backend = render_backend.expect("No renderer available");
+        render_backend.init_window(&window);
 
 
         #[cfg(target_os="macos")]

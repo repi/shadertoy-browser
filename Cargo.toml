@@ -27,7 +27,7 @@ foreign-types = "0.3.2"
 rust-base58 = "0.0.4"
 shadertoy = { path = "src/shadertoy", version = "0.1.1" }
 
-[target.'cfg(target = "macosx")'.dependencies]
+[target.'cfg(target_os = "macos")'.dependencies]
 cocoa = "0.13.0"
 objc = "0.2.2"
 objc-foundation = "0.1.1"
