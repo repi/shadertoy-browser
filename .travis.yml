@@ -5,3 +5,4 @@ rust:
   - stable
 os:
   - osx
+  - linux
