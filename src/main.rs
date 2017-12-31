@@ -56,10 +56,10 @@ fn write_file(path: &Path, buf: &[u8]) {
         Ok(file) => file,
     };
 
-    file.write_all(buf).unwrap();
+    let _ = file.write_all(buf);
 }
 
-fn search(api_key: &str, search_str: Option<&str>) -> Vec<String> {
+fn search(api_key: &str, search_str: Option<&str>) -> Result<Vec<String>, Box<std::error::Error>> {
 
     let query_str: String = {
         if let Some(search_str) = search_str {
@@ -73,58 +73,32 @@ fn search(api_key: &str, search_str: Option<&str>) -> Vec<String> {
 
     let mut json_str;
 
-    if path.exists() {
-        let mut file = match File::open(&path) {
-            Err(why) => panic!("couldn't open {:?}: {}", path, why.description()),
-            Ok(file) => file,
-        };
-
+    if let Ok(mut file) = File::open(&path) {
         json_str = String::new();
-        file.read_to_string(&mut json_str).unwrap();
+        file.read_to_string(&mut json_str)?;
     } else {
         let client = reqwest::Client::new();
-        json_str = client.get(&query_str).send().unwrap().text().unwrap();
+        json_str = client.get(&query_str).send()?.text()?;
         write_file(&path, json_str.as_bytes());
     }
 
-    let mut shadertoys: Vec<String> = vec![];
-/*
-    let json_result: serde_json::Result<serde_json::Value> = serde_json::from_str(&json_str);
-
-    match json_result {
-        Ok(json) => {
-            let test = &json["Results"];
-            for v in test.as_array().unwrap().iter() {
-                if let Some(shadertoy) = v.as_str() {
-                    shadertoys.push(String::from(shadertoy));
-                }
-            }
-        },
-        Err(_str) => (),
-    }
-*/
-
     let search_result: serde_json::Result<shadertoy::SearchResult> = serde_json::from_str(&json_str);
 
-    if let Ok(r) = search_result {
-        shadertoys = r.results;
+    match search_result {
+        Ok(r) => Ok(r.results),
+        Err(err) => Err(Box::new(err)),
     }
-
-    shadertoys
 }
 
-fn query(api_key: &str, search_str: Option<&str>, sender: std::sync::mpsc::Sender<String>) {
+fn query(api_key: &str, search_str: Option<&str>, sender: std::sync::mpsc::Sender<String>) -> Result<(),Box<std::error::Error>> {
 
-    let shadertoys = search(api_key, search_str);
+    let shadertoys = search(api_key, search_str)?;
 
     let shadertoys_len = shadertoys.len();
 
     println!("found {} shadertoys", shadertoys_len);
 
-    match std::fs::create_dir_all("output") {
-        Err(why) => println!("couldn't create directory: {:?}", why.kind()),
-        Ok(_) => {}
-    }
+    std::fs::create_dir_all("output")?;
 
     let index = AtomicUsize::new(0);
     let built_count = AtomicUsize::new(0);
@@ -144,31 +118,23 @@ fn query(api_key: &str, search_str: Option<&str>, sender: std::sync::mpsc::Sende
         if !path.exists() {
             json_str = client
                 .get(&format!("https://www.shadertoy.com/api/v1/shaders/{}?key={}", shadertoy, api_key))
-                .send()
-                .unwrap()
-                .text()
-                .unwrap();
+                .send()?
+                .text()?;
 
             println!("shadertoy ({} / {}): {}, json size: {}", index.load(Ordering::SeqCst), shadertoys_len, shadertoy, json_str.len());
 
-            let json: shadertoy::Root = serde_json::from_str(&json_str).unwrap();
-            json_str = serde_json::to_string_pretty(&json).unwrap();
-
+            let json: shadertoy::Root = serde_json::from_str(&json_str)?;
+            json_str = serde_json::to_string_pretty(&json)?;
             write_file(&path, json_str.as_bytes());
         } else {
             println!("shadertoy ({} / {}): {}", index.load(Ordering::SeqCst), shadertoys_len, shadertoy);
 
-            let mut file = match File::open(&path) {
-                Err(why) => panic!("couldn't open {:?}: {}", path, why.description()),
-                Ok(file) => file,
-            };
-
+            let mut file = File::open(&path)?;
             json_str = String::new();
-            file.read_to_string(&mut json_str).unwrap();
+            file.read_to_string(&mut json_str)?;
         }
 
-
-        let root: shadertoy::Root = serde_json::from_str(&json_str).unwrap();
+        let root: shadertoy::Root = serde_json::from_str(&json_str)?;
 
         let mut success = true;
 
@@ -226,13 +192,13 @@ fn query(api_key: &str, search_str: Option<&str>, sender: std::sync::mpsc::Sende
 
                     if pass.pass_type == "image" && pass.inputs.len() == 0 {
                         // sent built shader
-                        sender.send(full_source_metal).unwrap();
+                        sender.send(full_source_metal)?;
                     }
-                }
+                },
                 Err(string) => {
                     success = false;
                     println!("Failed compiling shader {}: {}", glsl_path.to_str().unwrap(), string);
-                }
+                },
             }
 
             // download texture inputs
@@ -250,11 +216,10 @@ fn query(api_key: &str, search_str: Option<&str>, sender: std::sync::mpsc::Sende
 
                     let mut data_response = client
                         .get(&format!("https://www.shadertoy.com/{}", input.src))
-                        .send()
-                        .unwrap();
+                        .send()?;
 
                     let mut data = vec![];
-                    data_response.read_to_end(&mut data).unwrap();
+                    data_response.read_to_end(&mut data)?;
 
                     println!("Asset downloaded: {}, {} bytes", input.src, data.len());
 
@@ -276,6 +241,8 @@ fn query(api_key: &str, search_str: Option<&str>, sender: std::sync::mpsc::Sende
     }
 
     println!("{} / {} shadertoys fully built", built_count.load(Ordering::SeqCst), shadertoys_len);
+    
+    Ok(())
 }
 
 fn run(matches: &clap::ArgMatches) {
@@ -284,7 +251,10 @@ fn run(matches: &clap::ArgMatches) {
     let api_key = matches.value_of("apikey").unwrap();
     let search_str = matches.value_of("search");
 
-    query(api_key, search_str, sender.clone());
+    if let Err(err) = query(api_key, search_str, sender.clone()) {
+        println!("Query failed: {}", err);
+        std::process::exit(1);
+    }
 
     if !matches.is_present("headless") {
 
@@ -309,7 +279,6 @@ fn run(matches: &clap::ArgMatches) {
         let mut built_shadertoy_shaders: Vec<String> = Vec::new();
 
         while running {
-
 
             while let Ok(shader_source) = receiver.try_recv() {
                 built_shadertoy_shaders.push(shader_source);
