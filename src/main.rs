@@ -15,11 +15,6 @@ extern crate rust_base58 as base58;
 extern crate serde_json;
 extern crate reqwest;
 
-// TODO move this to render_metal
-extern crate cocoa;
-#[macro_use]
-extern crate objc;
-
 use clap::{Arg, App};
 use std::io::Write;
 use std::io::prelude::*;
@@ -29,15 +24,25 @@ use std::error::Error;
 use std::sync::atomic::{AtomicUsize, Ordering};
 //use std::thread;
 //use rayon::prelude::*;
-use cocoa::foundation::NSAutoreleasePool;
 
 //use chrono::prelude::*;
 use base58::ToBase58;
 
 mod render;
 use render::*;
+
+
+// TODO try and get rid of most of this and only depend on render_metal
+#[cfg(target_os="macos")]
 mod render_metal;
+#[cfg(target_os="macos")]
 use render_metal::*;
+#[cfg(target_os="macos")]
+extern crate objc;
+#[cfg(target_os="macos")]
+extern crate cocoa;
+#[cfg(target_os="macos")]
+use cocoa::foundation::NSAutoreleasePool;
 
 fn write_file(path: &Path, buf: &[u8]) {
 
@@ -184,6 +189,7 @@ fn query(api_key: &str, search_str: Option<&str>, sender: std::sync::mpsc::Sende
             let glsl_path = PathBuf::from(format!("output/{} {}.glsl", shadertoy, pass.name));
             write_file(&glsl_path, full_source.as_bytes());
 
+            #[cfg(target_os="macos")]
             match convert_glsl_to_metal(glsl_path.to_str().unwrap(), "main", full_source.as_str()) {
                 Ok(full_source_metal) => {
                     // save out the generated Metal file, for debugging
@@ -261,14 +267,22 @@ fn run(matches: &clap::ArgMatches) {
         let mut events_loop = winit::EventsLoop::new();
         let window = winit::WindowBuilder::new()
             .with_dimensions(1024, 768)
-            .with_title("Metal".to_string())
+            .with_title("Shadertoy Browser".to_string())
             .build(&events_loop)
             .unwrap();
 
-        let mut render_backend = MetalRenderBackend::new();
-        render_backend.init_window(&window);
+        let mut render_backend: Option<Box<RenderBackend>> = None;
+
+        #[cfg(target_os="macos")]
+        {
+            render.backend = Box::new(MetalRenderBackend::new());
+            render_backend.init_window(&window);
+        }
+
+        let mut render_backend = render_backend.expect("No renderer available");
 
 
+        #[cfg(target_os="macos")]
         let mut pool = unsafe { NSAutoreleasePool::new(cocoa::base::nil) };
 
         let mut running = true;
@@ -309,7 +323,6 @@ fn run(matches: &clap::ArgMatches) {
                 _ => (),
             });
 
-
             render_backend.present(RenderParams {
                 mouse_cursor_pos: cursor_pos,
                 shader_source: {
@@ -321,6 +334,7 @@ fn run(matches: &clap::ArgMatches) {
                 },
             });
 
+            #[cfg(target_os="macos")]
             unsafe {
                 msg_send![pool, release];
                 pool = NSAutoreleasePool::new(cocoa::base::nil);
