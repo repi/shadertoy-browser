@@ -1,6 +1,6 @@
 # Rusty Shadertoy Browser
 
-[![Build Status](https://travis-ci.com/repi/shadertoy-browser.svg?token=8SzG1tHkq3FpBRftmohU&branch=master)](https://travis-ci.com/repi/shadertoy-browser) [MIT/Apache]([![MIT/Apache][s3])
+[![Build Status](https://travis-ci.com/repi/shadertoy-browser.svg?token=8SzG1tHkq3FpBRftmohU&branch=master)](https://travis-ci.com/repi/shadertoy-browser) ![MIT/Apache](https://img.shields.io/badge/license-MIT%2FApache-blue.svg)
 
 Small [Shadertoy](http://shadertoy.com) browser & viewer for Mac built in [Rust](https://www.rust-lang.org).
 
