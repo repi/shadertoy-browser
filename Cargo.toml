@@ -1,6 +1,7 @@
 [package]
 name = "shadertoy-browser"
 version = "0.2.1"
+description = "Small Shadertoy browser & viewer for Mac built in Rust"
 authors = ["Johan Andersson <repi@repi.se>"]
 repository = "https://github.com/repi/shadertoy_viewer"
 readme = "README.md"
