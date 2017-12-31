@@ -11,6 +11,11 @@ categories = ["rendering"]
 [badges]
 travis-ci = { repository = "repi/shadertoy-browser" }
 
+[workspace]
+members = [
+    "src/shadertoy"
+]
+
 [dependencies]
 floating-duration = "0.1.1"
 chrono = "0.4.0"
