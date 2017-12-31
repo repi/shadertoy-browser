@@ -1,3 +1,6 @@
+// These are the json types that the Shadertoy API outputs
+// This is manually derived
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SearchResult {
     #[serde(rename = "Results")]
