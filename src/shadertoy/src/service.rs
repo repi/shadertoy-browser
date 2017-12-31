@@ -30,12 +30,12 @@ impl Service {
         };
 
         let json_str = self.client.get(&query_str).send()?.text()?;
-    
+
         let search_result: serde_json::Result<SearchResult> = serde_json::from_str(&json_str);
 
         match search_result {
             Ok(r) => Ok(r.results),
             Err(err) => Err(Box::new(err)),
         }
-    }    
+    }
 }

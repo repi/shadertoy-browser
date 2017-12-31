@@ -33,16 +33,16 @@ use render::*;
 
 
 // TODO try and get rid of most of this and only depend on render_metal
-#[cfg(target_os="macos")]
+#[cfg(target_os = "macos")]
 mod render_metal;
-#[cfg(target_os="macos")]
+#[cfg(target_os = "macos")]
 use render_metal::*;
-#[cfg(target_os="macos")]
+#[cfg(target_os = "macos")]
 #[macro_use]
 extern crate objc;
-#[cfg(target_os="macos")]
+#[cfg(target_os = "macos")]
 extern crate cocoa;
-#[cfg(target_os="macos")]
+#[cfg(target_os = "macos")]
 use cocoa::foundation::NSAutoreleasePool;
 
 fn write_file(path: &Path, buf: &[u8]) {
@@ -69,10 +69,13 @@ fn search(api_key: &str, search_str: Option<&str>) -> Result<Vec<String>, Box<st
 
     // check if we can find a cached search on disk
 
-    let path = PathBuf::from(&format!("output/query/{}", match search_str {
-        Some(str) => str.as_bytes().to_base58(),
-        None => "all".to_string(),
-    }));
+    let path = PathBuf::from(&format!(
+        "output/query/{}",
+        match search_str {
+            Some(str) => str.as_bytes().to_base58(),
+            None => "all".to_string(),
+        }
+    ));
 
     if let Ok(mut file) = File::open(&path) {
         let mut json_str = String::new();
@@ -81,7 +84,7 @@ fn search(api_key: &str, search_str: Option<&str>) -> Result<Vec<String>, Box<st
         match search_result {
             Ok(r) => Ok(r.results),
             Err(err) => Err(Box::new(err)),
-        }        
+        }
     } else {
         // issue the actual request
         let service = shadertoy::Service::new(api_key);
@@ -91,12 +94,12 @@ fn search(api_key: &str, search_str: Option<&str>) -> Result<Vec<String>, Box<st
                 write_file(&path, serde_json::to_string(&result)?.as_bytes());
                 Ok(result)
             }
-            Err(err) => Err(err)
+            Err(err) => Err(err),
         }
     }
 }
 
-fn query(api_key: &str, search_str: Option<&str>, sender: std::sync::mpsc::Sender<String>) -> Result<(),Box<std::error::Error>> {
+fn query(api_key: &str, search_str: Option<&str>, sender: std::sync::mpsc::Sender<String>) -> Result<(), Box<std::error::Error>> {
 
     let shadertoys = search(api_key, search_str)?;
 
@@ -190,7 +193,7 @@ fn query(api_key: &str, search_str: Option<&str>, sender: std::sync::mpsc::Sende
             let glsl_path = PathBuf::from(format!("output/{} {}.glsl", shadertoy, pass.name));
             write_file(&glsl_path, full_source.as_bytes());
 
-            #[cfg(target_os="macos")]
+            #[cfg(target_os = "macos")]
             match convert_glsl_to_metal(glsl_path.to_str().unwrap(), "main", full_source.as_str()) {
                 Ok(full_source_metal) => {
                     // save out the generated Metal file, for debugging
@@ -201,11 +204,11 @@ fn query(api_key: &str, search_str: Option<&str>, sender: std::sync::mpsc::Sende
                         // sent built shader
                         sender.send(full_source_metal)?;
                     }
-                },
+                }
                 Err(string) => {
                     success = false;
                     println!("Failed compiling shader {}: {}", glsl_path.to_str().unwrap(), string);
-                },
+                }
             }
 
             // download texture inputs
@@ -248,7 +251,7 @@ fn query(api_key: &str, search_str: Option<&str>, sender: std::sync::mpsc::Sende
     }
 
     println!("{} / {} shadertoys fully built", built_count.load(Ordering::SeqCst), shadertoys_len);
-    
+
     Ok(())
 }
 
@@ -274,7 +277,7 @@ fn run(matches: &clap::ArgMatches) {
 
         let mut render_backend: Option<Box<RenderBackend>> = None;
 
-        #[cfg(target_os="macos")]
+        #[cfg(target_os = "macos")]
         {
             render_backend = Some(Box::new(MetalRenderBackend::new()));
         }
@@ -335,7 +338,7 @@ fn run(matches: &clap::ArgMatches) {
                 },
             });
 
-            #[cfg(target_os="macos")]
+            #[cfg(target_os = "macos")]
             unsafe {
                 msg_send![pool, release];
                 pool = NSAutoreleasePool::new(cocoa::base::nil);
