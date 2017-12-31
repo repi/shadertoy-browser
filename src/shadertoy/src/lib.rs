@@ -2,7 +2,7 @@
 extern crate serde_derive;
 
 mod types;
-mod service;
+mod client;
 
 pub use types::*;
-pub use service::*;
+pub use client::*;

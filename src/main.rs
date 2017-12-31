@@ -87,8 +87,8 @@ fn search(api_key: &str, search_str: Option<&str>) -> Result<Vec<String>, Box<st
         }
     } else {
         // issue the actual request
-        let service = shadertoy::Service::new(api_key);
-        match service.search(search_str) {
+        let client = shadertoy::Client::new(api_key);
+        match client.search(search_str) {
             Ok(result) => {
                 // cache search results to a file on disk
                 write_file(&path, serde_json::to_string(&result)?.as_bytes());

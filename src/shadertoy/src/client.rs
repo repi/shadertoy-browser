@@ -6,14 +6,14 @@ extern crate serde_json;
 use std;
 use types::*;
 
-pub struct Service {
+pub struct Client {
     api_key: String,
     client: reqwest::Client,
 }
 
-impl Service {
-    pub fn new(api_key: &str) -> Service {
-        Service {
+impl Client {
+    pub fn new(api_key: &str) -> Client {
+        Client {
             api_key: api_key.to_string(),
             client: reqwest::Client::new(),
         }
