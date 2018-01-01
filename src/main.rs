@@ -335,6 +335,8 @@ fn run(matches: &clap::ArgMatches) {
         let mut cursor_pos = (0.0f64, 0.0f64);
 
         let mut shadertoy_index = 0usize;
+        let mut prev_shadertoy_index = 1usize;
+
 
         while running {
 
@@ -362,6 +364,15 @@ fn run(matches: &clap::ArgMatches) {
                 }
                 _ => (),
             });
+
+            // update window title
+
+            if shadertoy_index != prev_shadertoy_index {
+                window.set_title(&format!("Shadertoy Browser: {} / {}", shadertoy_index+1, built_shadertoy_shaders.len()));
+                prev_shadertoy_index = shadertoy_index;
+            }
+
+            // render frame
 
             render_backend.present(RenderParams {
                 mouse_cursor_pos: cursor_pos,
