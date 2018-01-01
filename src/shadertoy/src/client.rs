@@ -77,7 +77,7 @@ impl Client {
             })).collect::<String>(),
             self.api_key);
 
-        println!("{}", &query_str);
+        //println!("{}", &query_str);
 
         let json_str = self.rest_client.get(&query_str).send()?.text()?;
 
