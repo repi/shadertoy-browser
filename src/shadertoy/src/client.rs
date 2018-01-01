@@ -100,6 +100,7 @@ impl Client {
         let json_str = self.rest_client.get(&query_str).send()?.text()?;
 
         #[derive(Serialize, Deserialize, Debug)]
+        #[serde(deny_unknown_fields)]
         struct SearchResult {
             #[serde(default)]
             #[serde(rename = "Error")]
@@ -135,6 +136,7 @@ impl Client {
             .text()?;
 
         #[derive(Serialize, Deserialize, Debug)]
+        #[serde(deny_unknown_fields)]
         struct ShaderRoot {
             #[serde(default)]
             #[serde(rename = "Error")]

@@ -2,6 +2,7 @@
 // This is manually derived
 
 #[derive(Serialize, Deserialize, Debug)]
+#[serde(deny_unknown_fields)]
 pub struct Shader {
     pub ver: String,
     pub info: ShaderInfo,
@@ -9,6 +10,7 @@ pub struct Shader {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+#[serde(deny_unknown_fields)]
 pub struct ShaderInfo {
     pub id: String,
     pub date: String,
@@ -24,6 +26,7 @@ pub struct ShaderInfo {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+#[serde(deny_unknown_fields)]
 pub struct RenderPass {
     pub inputs: Vec<RenderPassInput>,
     pub outputs: Vec<RenderPassOutput>,
@@ -36,6 +39,7 @@ pub struct RenderPass {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+#[serde(deny_unknown_fields)]
 pub struct RenderPassInput {
     pub id: u64,
     pub src: String,
@@ -46,12 +50,14 @@ pub struct RenderPassInput {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+#[serde(deny_unknown_fields)]
 pub struct RenderPassOutput {
     pub id: u64,
     pub channel: u64,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+#[serde(deny_unknown_fields)]
 pub struct Sampler {
     pub filter: String,
     pub wrap: String,
