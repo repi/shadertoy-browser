@@ -6,7 +6,7 @@ Small [Shadertoy](http://shadertoy.com) browser & viewer for Mac built in [Rust]
 
 This application uses the [Shadertoy REST API](http://shadertoy.com/api) to search for Shadertoys and then downloads them locally and converts them using [`shaderc-rs`](https://crates.io/crates/shaderc) and [`spirv-cross`](https://crates.io/crates/spirv_cross) to be natively rendered on Mac using [`metal-rs`](https://crates.io/crates/metal-rs).
 
-The API queries are done through the [`shadertoy`](https://crates.io/crates/shadertoy) crate, which can be found in  [`src/shadertoy`](src/shadertoy)
+The API queries are done through the [`shadertoy`](https://crates.io/crates/shadertoy) crate, which is also part of this repository in [`src/shadertoy`](src/shadertoy)
 
 ## Usage
 
