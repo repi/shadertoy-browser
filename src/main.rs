@@ -72,25 +72,28 @@ fn search(client: &shadertoy::Client, search_str: Option<&str>) -> Result<Vec<St
 
     // check if we can find a cached search on disk
 
-    let path = PathBuf::from(&format!(
-        "output/query/{}",
-        match search_str {
-            Some(str) => str.as_bytes().to_base58(),
-            None => "all".to_string(),
-        }
-    ));
+    let search_params = shadertoy::SearchParams {
+        string: match search_str {
+            Some(string) => string,
+            None => "",
+        },
+        sort_order: shadertoy::SearchSortOrder::Popular,
+        filters: vec![],
+    };
+
+    let path = PathBuf::from(&format!("output/query/{}", serde_json::to_string(&search_params)?.as_bytes().to_base58()));
 
     if let Ok(mut file) = File::open(&path) {
         let mut json_str = String::new();
         file.read_to_string(&mut json_str)?;
-        let search_result: serde_json::Result<shadertoy::SearchResult> = serde_json::from_str(&json_str);
+        let search_result: serde_json::Result<Vec<String>> = serde_json::from_str(&json_str);
         match search_result {
-            Ok(r) => Ok(r.results),
+            Ok(r) => Ok(r),
             Err(err) => Err(Box::new(err)),
         }
     } else {
         // issue the actual request
-        match client.search(search_str) {
+        match client.search(search_params) {
             Ok(result) => {
                 // cache search results to a file on disk
                 write_file(&path, serde_json::to_string(&result)?.as_bytes());
@@ -122,7 +125,7 @@ fn query(api_key: &str, search_str: Option<&str>, sender: std::sync::mpsc::Sende
 
         println!("shadertoy ({} / {}): {}", index.fetch_add(1, Ordering::SeqCst), shadertoys_len, shadertoy);
 
-        let path = PathBuf::from(format!("output/{}.json", shadertoy));
+        let path = PathBuf::from(format!("output/shader/{}.json", shadertoy));
 
         let mut shader;
 
@@ -180,14 +183,14 @@ fn query(api_key: &str, search_str: Option<&str>, sender: std::sync::mpsc::Sende
             let full_source = format!("{}\n{}\n{}\n{}", header_source, sampler_source, pass.code, footer_source);
 
             // save out the source GLSL file, for debugging
-            let glsl_path = PathBuf::from(format!("output/{} {}.glsl", shadertoy, pass.name));
+            let glsl_path = PathBuf::from(format!("output/shader/{} {}.glsl", shadertoy, pass.name));
             write_file(&glsl_path, full_source.as_bytes());
 
             #[cfg(target_os = "macos")]
             match convert_glsl_to_metal(glsl_path.to_str().unwrap(), "main", full_source.as_str()) {
                 Ok(full_source_metal) => {
                     // save out the generated Metal file, for debugging
-                    let msl_path = PathBuf::from(format!("output/{} {}.metal", shadertoy, pass.name));
+                    let msl_path = PathBuf::from(format!("output/shader/{} {}.metal", shadertoy, pass.name));
                     write_file(&msl_path, full_source_metal.as_bytes());
 
                     if pass.pass_type == "image" && pass.inputs.len() == 0 {

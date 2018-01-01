@@ -6,6 +6,36 @@ extern crate serde_json;
 use std;
 use types::*;
 
+#[derive(Serialize, Deserialize, Debug, PartialEq, Copy, Clone)]
+pub enum SearchSortOrder {
+    Name,
+    Love,
+    Popular,
+    Newest,
+    Hot
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Copy, Clone)]
+pub enum SearchFilter {
+    Vr,
+    SoundOutput,
+    SoundInput,
+    Webcam,
+    MultiPass,
+    MusicStream
+}
+
+/// Search parameters for Client::search.
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+pub struct SearchParams<'a> {
+    /// Search string, set as empty to get ALL shadertoys.
+    pub string: &'a str,
+    /// Sort order of resulting list of shaders.
+    pub sort_order: SearchSortOrder,
+    /// Inclusion filters, only the shadertoys matching this filter will be included in the result.
+    pub filters: Vec<SearchFilter>,
+}
+
 /// Client for issuing queries against the Shadertoy API and database
 pub struct Client {
     pub api_key: String,
@@ -23,17 +53,39 @@ impl Client {
     }
 
     /// Issues a search query for shadertoys.
-    pub fn search(&self, search_str: Option<&str>) -> Result<Vec<String>, Box<std::error::Error>> {
+    pub fn search(&self, params: SearchParams) -> Result<Vec<String>, Box<std::error::Error>> {
 
-        let query_str: String = {
-            if let Some(search_str) = search_str {
-                format!("https://www.shadertoy.com/api/v1/shaders/query/{}?key={}", search_str, self.api_key)
-            } else {
-                format!("https://www.shadertoy.com/api/v1/shaders?key={}", self.api_key)
-            }
-        };
+        let query_str = format!("https://www.shadertoy.com/api/v1/shaders{}?sort={}&{}key={}", 
+            match params.string.is_empty() {
+                false => format!("/query/{}", params.string),
+                true => String::from(""),
+            },
+            match params.sort_order {
+                SearchSortOrder::Name => "name",
+                SearchSortOrder::Love => "love",
+                SearchSortOrder::Popular => "popular",
+                SearchSortOrder::Newest => "newest",
+                SearchSortOrder::Hot => "hot",
+            },
+            params.filters.iter().map(|f| format!("filter={}&", match *f {
+                SearchFilter::Vr => "vr",
+                SearchFilter::SoundOutput => "soundoutput",
+                SearchFilter::SoundInput => "soundinput",
+                SearchFilter::Webcam => "webcam",
+                SearchFilter::MultiPass => "multipass",
+                SearchFilter::MusicStream => "musicstream",            
+            })).collect::<String>(),
+            self.api_key);
+
+        println!("{}", &query_str);
 
         let json_str = self.rest_client.get(&query_str).send()?.text()?;
+
+        #[derive(Serialize, Deserialize, Debug)]
+        struct SearchResult {
+            #[serde(rename = "Results")]
+            results: Vec<String>,
+        }
 
         let search_result: serde_json::Result<SearchResult> = serde_json::from_str(&json_str);
 
