@@ -8,17 +8,31 @@ This application uses the [Shadertoy REST API](http://shadertoy.com/api) to sear
 
 The API queries are done through the [`shadertoy`](https://crates.io/crates/shadertoy) crate, which can be found in  `src/shadertoy`
 
-
 ## Usage
 
-TODO
+```text
+USAGE:
+    shadertoy-browser [FLAGS] [OPTIONS]
+
+FLAGS:
+        --help        Prints help information
+    -h, --headless    Don't render, only download shadertoys
+    -V, --version     Prints version information
+
+OPTIONS:
+    -k, --apikey <key>          Set shadertoy API key to use. Create your key on https://www.shadertoy.com/myapps
+                                [default: BtHtW3]
+    -f, --filter <filter>...    Inclusion filters [values: VR, SoundOutput, SoundInput, Webcam, MultiPass, MusicStream]
+    -o, --order <order>         Sort order [default: Popular]  [values: Name, Love, Popular, Newest, Hot]
+    -s, --search <string>       Search string to filter which shadertoys to get
+```
 
 ## Building
 
 First make sure you have [Rust installed](https://www.rust-lang.org/en-US/install.html) installed.
 Then building is easy:
 
-```
+```sh
 $ git clone https://github.com/repi/shadertoy-browser
 $ cd shadertoy-browser
 $ cargo build --release
