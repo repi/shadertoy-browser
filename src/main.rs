@@ -77,7 +77,7 @@ fn search(client: &shadertoy::Client, search_str: Option<&str>) -> Result<Vec<St
             Some(string) => string,
             None => "",
         },
-        sort_order: shadertoy::SearchSortOrder::Popular,
+        sort_order: shadertoy::SearchSortOrder::Love,
         filters: vec![],
     };
 
@@ -123,8 +123,6 @@ fn query(api_key: &str, search_str: Option<&str>, sender: std::sync::mpsc::Sende
     for shadertoy in shadertoys.iter() {
         //    shadertoys.par_iter().for_each(|shadertoy| {
 
-        println!("shadertoy ({} / {}): {}", index.fetch_add(1, Ordering::SeqCst), shadertoys_len, shadertoy);
-
         let path = PathBuf::from(format!("output/shader/{}.json", shadertoy));
 
         let mut shader;
@@ -137,6 +135,14 @@ fn query(api_key: &str, search_str: Option<&str>, sender: std::sync::mpsc::Sende
             File::open(&path)?.read_to_string(&mut json_str)?;
             shader = serde_json::from_str(&json_str)?;
         }
+
+        println!("({} / {}): {} - \"{}\" by {}, {} likes", 
+            index.fetch_add(1, Ordering::SeqCst), 
+            shadertoys_len, 
+            shadertoy,
+            shader.info.name, 
+            shader.info.username,
+            shader.info.likes);
 
         let mut success = true;
 
@@ -229,9 +235,11 @@ fn query(api_key: &str, search_str: Option<&str>, sender: std::sync::mpsc::Sende
                     write_file(&path, &data);
                 } else {
 
+                /*
                     if let Ok(metadata) = path.metadata() {
                         println!("Asset: {}, {} bytes", input.src, metadata.len());
                     }
+                */
                 }
 
             }
