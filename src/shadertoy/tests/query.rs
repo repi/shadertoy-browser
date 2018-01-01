@@ -6,8 +6,11 @@ fn test_query() {
 
     // try connecting to shadertoy.com and search for all "car" shadertoys
     // this of course requires one to be online
-    let result = client.search(Some("car"));
+    let query = client.search(Some("car")).unwrap();
+    assert!(query.len() > 0);
 
-    assert!(result.is_ok());
-    assert!(result.ok().unwrap().len() > 0);
+    // get the first shader in the list
+
+    let shader = client.get_shader(&query[0]).unwrap();
+    assert!(shader.renderpass.len() > 0);
 }

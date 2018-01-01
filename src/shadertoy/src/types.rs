@@ -8,12 +8,6 @@ pub struct SearchResult {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct ShaderRoot {
-    #[serde(rename = "Shader")]
-    pub shader: Shader,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
 pub struct Shader {
     pub ver: String,
     pub info: ShaderInfo,
@@ -73,3 +67,4 @@ pub struct Sampler {
     //pub srgb: bool,
     pub internal: String,
 }
+

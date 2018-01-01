@@ -8,8 +8,8 @@ use types::*;
 
 /// Client for issuing queries against the Shadertoy API and database
 pub struct Client {
-    api_key: String,
-    client: reqwest::Client,
+    pub api_key: String,
+    pub rest_client: reqwest::Client,
 }
 
 impl Client {
@@ -18,7 +18,7 @@ impl Client {
     pub fn new(api_key: &str) -> Client {
         Client {
             api_key: api_key.to_string(),
-            client: reqwest::Client::new(),
+            rest_client: reqwest::Client::new(),
         }
     }
 
@@ -33,12 +33,33 @@ impl Client {
             }
         };
 
-        let json_str = self.client.get(&query_str).send()?.text()?;
+        let json_str = self.rest_client.get(&query_str).send()?.text()?;
 
         let search_result: serde_json::Result<SearchResult> = serde_json::from_str(&json_str);
 
         match search_result {
             Ok(r) => Ok(r.results),
+            Err(err) => Err(Box::new(err)),
+        }
+    }
+
+    pub fn get_shader(&self, shader_id: &str) -> Result<Shader, Box<std::error::Error>> {
+
+        let json_str = self.rest_client
+            .get(&format!("https://www.shadertoy.com/api/v1/shaders/{}?key={}", shader_id, self.api_key))
+            .send()?
+            .text()?;
+
+        #[derive(Serialize, Deserialize, Debug)]
+        struct ShaderRoot {
+            #[serde(rename = "Shader")]
+            shader: Shader,
+        }
+
+        let shader_result: serde_json::Result<ShaderRoot> = serde_json::from_str(&json_str);
+
+        match shader_result {
+            Ok(r) => Ok(r.shader),
             Err(err) => Err(Box::new(err)),
         }
     }

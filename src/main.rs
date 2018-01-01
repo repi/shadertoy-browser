@@ -16,10 +16,7 @@ extern crate chrono;
 extern crate rayon;
 extern crate winit;
 extern crate rust_base58 as base58;
-
-// TODO move this to shadertoy
 extern crate serde_json;
-extern crate reqwest;
 
 use clap::{Arg, App};
 use std::io::Write;
@@ -71,7 +68,7 @@ fn write_file(path: &Path, buf: &[u8]) {
     let _ = file.write_all(buf);
 }
 
-fn search(api_key: &str, search_str: Option<&str>) -> Result<Vec<String>, Box<std::error::Error>> {
+fn search(client: &shadertoy::Client, search_str: Option<&str>) -> Result<Vec<String>, Box<std::error::Error>> {
 
     // check if we can find a cached search on disk
 
@@ -93,7 +90,6 @@ fn search(api_key: &str, search_str: Option<&str>) -> Result<Vec<String>, Box<st
         }
     } else {
         // issue the actual request
-        let client = shadertoy::Client::new(api_key);
         match client.search(search_str) {
             Ok(result) => {
                 // cache search results to a file on disk
@@ -107,7 +103,9 @@ fn search(api_key: &str, search_str: Option<&str>) -> Result<Vec<String>, Box<st
 
 fn query(api_key: &str, search_str: Option<&str>, sender: std::sync::mpsc::Sender<String>) -> Result<(), Box<std::error::Error>> {
 
-    let shadertoys = search(api_key, search_str)?;
+    let client = shadertoy::Client::new(api_key);
+
+    let shadertoys = search(&client, search_str)?;
 
     let shadertoys_len = shadertoys.len();
 
@@ -118,42 +116,28 @@ fn query(api_key: &str, search_str: Option<&str>, sender: std::sync::mpsc::Sende
     let index = AtomicUsize::new(0);
     let built_count = AtomicUsize::new(0);
 
-    let client = reqwest::Client::new();
-
 
     for shadertoy in shadertoys.iter() {
         //    shadertoys.par_iter().for_each(|shadertoy| {
 
-        index.fetch_add(1, Ordering::SeqCst);
+        println!("shadertoy ({} / {}): {}", index.fetch_add(1, Ordering::SeqCst), shadertoys_len, shadertoy);
 
         let path = PathBuf::from(format!("output/{}.json", shadertoy));
 
-        let mut json_str: String;
+        let mut shader;
 
         if !path.exists() {
-            json_str = client
-                .get(&format!("https://www.shadertoy.com/api/v1/shaders/{}?key={}", shadertoy, api_key))
-                .send()?
-                .text()?;
-
-            println!("shadertoy ({} / {}): {}, json size: {}", index.load(Ordering::SeqCst), shadertoys_len, shadertoy, json_str.len());
-
-            let json: shadertoy::ShaderRoot = serde_json::from_str(&json_str)?;
-            json_str = serde_json::to_string_pretty(&json)?;
-            write_file(&path, json_str.as_bytes());
+            shader = client.get_shader(shadertoy)?;
+            write_file(&path, serde_json::to_string_pretty(&shader)?.as_bytes());
         } else {
-            println!("shadertoy ({} / {}): {}", index.load(Ordering::SeqCst), shadertoys_len, shadertoy);
-
-            let mut file = File::open(&path)?;
-            json_str = String::new();
-            file.read_to_string(&mut json_str)?;
+            let mut json_str = String::new();
+            File::open(&path)?.read_to_string(&mut json_str)?;
+            shader = serde_json::from_str(&json_str)?;
         }
-
-        let root: shadertoy::ShaderRoot = serde_json::from_str(&json_str)?;
 
         let mut success = true;
 
-        for pass in root.shader.renderpass.iter() {
+        for pass in shader.renderpass.iter() {
 
             // generate a GLSL snippet containing the sampler declarations
             // as they are dependent on the renderpass inputs in the JSON
@@ -230,7 +214,7 @@ fn query(api_key: &str, search_str: Option<&str>, sender: std::sync::mpsc::Sende
 
                 if !path.exists() {
 
-                    let mut data_response = client
+                    let mut data_response = client.rest_client
                         .get(&format!("https://www.shadertoy.com/{}", input.src))
                         .send()?;
 
