@@ -27,8 +27,8 @@ use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::error::Error;
 use std::sync::atomic::{AtomicUsize, Ordering};
-//use std::thread;
-//use rayon::prelude::*;
+use std::sync::Mutex;
+use rayon::prelude::*;
 
 //use chrono::prelude::*;
 use base58::ToBase58;
@@ -116,7 +116,7 @@ fn search(client: &shadertoy::Client, matches: &clap::ArgMatches) -> Result<Vec<
     }
 }
 
-fn query(matches: &clap::ArgMatches, sender: std::sync::mpsc::Sender<String>) -> Result<(), Box<std::error::Error>> {
+fn query(matches: &clap::ArgMatches) -> Result<Vec<String>, Box<std::error::Error>> {
 
     let api_key = matches.value_of("apikey").unwrap();
     let client = shadertoy::Client::new(api_key);
@@ -124,158 +124,186 @@ fn query(matches: &clap::ArgMatches, sender: std::sync::mpsc::Sender<String>) ->
     let shadertoys = search(&client, matches)?;
 
     let shadertoys_len = shadertoys.len();
-
     println!("found {} shadertoys", shadertoys_len);
 
-    std::fs::create_dir_all("output")?;
+    let built_shaders = Mutex::new(Vec::<String>::new());
 
-    let index = AtomicUsize::new(0);
-    let built_count = AtomicUsize::new(0);
+    {
+        // closure for processing a shadertoy
+    
+        let index = AtomicUsize::new(0);
+        let built_count = AtomicUsize::new(0);
 
+        let process_shadertoy = |shadertoy| -> Result<(),Box<std::error::Error>> {
 
-    for shadertoy in shadertoys.iter() {
-        //    shadertoys.par_iter().for_each(|shadertoy| {
+            let path = PathBuf::from(format!("output/shader/{}.json", shadertoy));
 
-        let path = PathBuf::from(format!("output/shader/{}.json", shadertoy));
+            let shader;
 
-        let shader;
-
-        if !path.exists() {
-            shader = client.get_shader(shadertoy)?;
-            write_file(&path, serde_json::to_string_pretty(&shader)?.as_bytes());
-        } else {
-            let mut json_str = String::new();
-            File::open(&path)?.read_to_string(&mut json_str)?;
-            shader = serde_json::from_str(&json_str)?;
-        }
-
-        println!("({} / {}) {} - {} by {}, {} views, {} likes", 
-            index.fetch_add(1, Ordering::SeqCst), 
-            shadertoys_len, 
-            shadertoy,
-            shader.info.name.green(), 
-            shader.info.username.blue(),
-            shader.info.viewed,
-            shader.info.likes);
-
-        let mut success = true;
-
-        for pass in shader.renderpass.iter() {
-
-            // generate a GLSL snippet containing the sampler declarations
-            // as they are dependent on the renderpass inputs in the JSON
-            // for exaxmple:
-            //     uniform sampler2D iChannel0;
-            //     uniform sampler2D iChannel1;
-            //     uniform sampler2D iChannel2;
-            //     uniform sampler2D iChannel3;
-
-            let mut sampler_source = String::new();
-            for input in pass.inputs.iter() {
-                let glsl_type = match input.ctype.as_str() {
-                    "texture" => "sampler2D",
-                    "volume" => "sampler3D",
-                    "cubemap" => "samplerCube",
-                    "buffer" => "sampler2D",
-                    "video" => "sampler2D",
-                    "webcam" => "sampler2D",
-                    "keyboard" => "sampler2D",
-                    "music" => "sampler2D",
-                    "musicstream" => "sampler2D",
-                    "mic" => "sampler2D",
-                    _ => {
-                        panic!("Unknown ctype: {}", input.ctype);
-                    }
-                };
-                sampler_source.push_str(&format!("uniform {} iChannel{};\n", glsl_type, input.channel));
+            if !path.exists() {
+                shader = client.get_shader(shadertoy)?;
+                write_file(&path, serde_json::to_string_pretty(&shader)?.as_bytes());
+            } else {
+                let mut json_str = String::new();
+                File::open(&path)?.read_to_string(&mut json_str)?;
+                shader = serde_json::from_str(&json_str)?;
             }
 
-            let header_source = include_str!("shadertoy_header.glsl");
-            let image_footer_source = include_str!("shadertoy_image_footer.glsl");
-            let sound_footer_source = include_str!("shadertoy_sound_footer.glsl");
+            println!("({} / {}) {} - {} by {}, {} views, {} likes", 
+                index.fetch_add(1, Ordering::SeqCst), 
+                shadertoys_len, 
+                shadertoy,
+                shader.info.name.green(), 
+                shader.info.username.blue(),
+                shader.info.viewed,
+                shader.info.likes);
 
-            let footer_source = match pass.pass_type.as_str() {
-                "sound" => sound_footer_source,
-                _ => image_footer_source,
-            };
+            let mut success = true;
 
-            // add our header source first which includes shadertoy constant & resource definitions
-            let full_source = format!("{}\n{}\n{}\n{}", header_source, sampler_source, pass.code, footer_source);
+            for pass in shader.renderpass.iter() {
 
-            // save out the source GLSL file, for debugging
-            let glsl_path = PathBuf::from(format!("output/shader/{} {}.glsl", shadertoy, pass.name));
-            write_file(&glsl_path, full_source.as_bytes());
+                // generate a GLSL snippet containing the sampler declarations
+                // as they are dependent on the renderpass inputs in the JSON
+                // for exaxmple:
+                //     uniform sampler2D iChannel0;
+                //     uniform sampler2D iChannel1;
+                //     uniform sampler2D iChannel2;
+                //     uniform sampler2D iChannel3;
 
-            #[cfg(target_os = "macos")]
-            match convert_glsl_to_metal(glsl_path.to_str().unwrap(), "main", full_source.as_str()) {
-                Ok(full_source_metal) => {
-                    // save out the generated Metal file, for debugging
-                    let msl_path = PathBuf::from(format!("output/shader/{} {}.metal", shadertoy, pass.name));
-                    write_file(&msl_path, full_source_metal.as_bytes());
-
-                    if pass.pass_type == "image" && pass.inputs.len() == 0 {
-                        // sent built shader
-                        sender.send(full_source_metal)?;
-                    }
+                let mut sampler_source = String::new();
+                for input in pass.inputs.iter() {
+                    let glsl_type = match input.ctype.as_str() {
+                        "texture" => "sampler2D",
+                        "volume" => "sampler3D",
+                        "cubemap" => "samplerCube",
+                        "buffer" => "sampler2D",
+                        "video" => "sampler2D",
+                        "webcam" => "sampler2D",
+                        "keyboard" => "sampler2D",
+                        "music" => "sampler2D",
+                        "musicstream" => "sampler2D",
+                        "mic" => "sampler2D",
+                        _ => {
+                            panic!("Unknown ctype: {}", input.ctype);
+                        }
+                    };
+                    sampler_source.push_str(&format!("uniform {} iChannel{};\n", glsl_type, input.channel));
                 }
-                Err(string) => {
-                    success = false;
-                    println!("Failed compiling shader {}: {}", glsl_path.to_str().unwrap(), string);
-                }
-            }
 
-            // download texture inputs
+                let header_source = include_str!("shadertoy_header.glsl");
+                let image_footer_source = include_str!("shadertoy_image_footer.glsl");
+                let sound_footer_source = include_str!("shadertoy_sound_footer.glsl");
 
-            for input in pass.inputs.iter() {
-
-                match input.ctype.as_str() {
-                    "texture" | "volume" | "cubemap" | "buffer" => (),
-                    _ => continue,
+                let footer_source = match pass.pass_type.as_str() {
+                    "sound" => sound_footer_source,
+                    _ => image_footer_source,
                 };
 
-                let path = PathBuf::from(format!("output{}", input.src));
+                // add our header source first which includes shadertoy constant & resource definitions
+                let full_source = format!("{}\n{}\n{}\n{}", header_source, sampler_source, pass.code, footer_source);
 
-                if !path.exists() {
+                // save out the source GLSL file, for debugging
+                let glsl_path = PathBuf::from(format!("output/shader/{} {}.glsl", shadertoy, pass.name));
+                write_file(&glsl_path, full_source.as_bytes());
 
-                    let mut data_response = client.rest_client
-                        .get(&format!("https://www.shadertoy.com/{}", input.src))
-                        .send()?;
-
-                    let mut data = vec![];
-                    data_response.read_to_end(&mut data)?;
-
-                    println!("Asset downloaded: {}, {} bytes", input.src, data.len());
-
-                    write_file(&path, &data);
-                } else {
-
-                /*
-                    if let Ok(metadata) = path.metadata() {
-                        println!("Asset: {}, {} bytes", input.src, metadata.len());
+                #[cfg(target_os = "macos")]
+                match convert_glsl_to_metal(glsl_path.to_str().unwrap(), "main", full_source.as_str()) {
+                    Ok(full_source_metal) => {
+                        // save out the generated Metal file, for debugging
+                        let msl_path = PathBuf::from(format!("output/shader/{} {}.metal", shadertoy, pass.name));
+                        write_file(&msl_path, full_source_metal.as_bytes());
+                    
+                        if pass.pass_type == "image" && pass.inputs.len() == 0 {
+                            
+                            let mut shaders = built_shaders.lock().unwrap();
+                            shaders.push(full_source_metal);
+                        }
                     }
-                */
+                    Err(string) => {
+                        success = false;
+                        println!("Failed compiling shader {}: {}", glsl_path.to_str().unwrap(), string);
+                    }
                 }
 
+                // download texture inputs
+
+                for input in pass.inputs.iter() {
+
+                    match input.ctype.as_str() {
+                        "texture" | "volume" | "cubemap" | "buffer" => (),
+                        _ => continue,
+                    };
+
+                    let path = PathBuf::from(format!("output{}", input.src));
+
+                    if !path.exists() {
+
+                        let mut data_response = client.rest_client
+                            .get(&format!("https://www.shadertoy.com/{}", input.src))
+                            .send()?;
+
+                        let mut data = vec![];
+                        data_response.read_to_end(&mut data)?;
+
+                        println!("Asset downloaded: {}, {} bytes", input.src, data.len());
+
+                        write_file(&path, &data);
+                    } else {
+
+                    /*
+                        if let Ok(metadata) = path.metadata() {
+                            println!("Asset: {}, {} bytes", input.src, metadata.len());
+                        }
+                    */
+                    }
+
+                }
+            }
+
+            if success {
+                built_count.fetch_add(1, Ordering::SeqCst);
+            }
+
+            Ok(())
+        };
+
+        
+        let threads: i64 = matches.value_of("threads").unwrap().parse().unwrap();
+
+
+        if threads == 0 {
+            for shadertoy in shadertoys.iter() {
+                let _r_ = process_shadertoy(shadertoy);
             }
         }
+        else 
+        {
+            if threads > 1 {
+                rayon::initialize(rayon::Configuration::new()
+                    .num_threads(threads as usize))?;
+            }
 
-        if success {
-            built_count.fetch_add(1, Ordering::SeqCst);
+            shadertoys.par_iter().for_each(|shadertoy| {
+                let _r_ = process_shadertoy(shadertoy);
+            });
         }
-        //    });
+
+        println!("{} / {} shadertoys fully built", built_count.load(Ordering::SeqCst), shadertoys_len);
     }
 
-    println!("{} / {} shadertoys fully built", built_count.load(Ordering::SeqCst), shadertoys_len);
-
-    Ok(())
+    Ok(built_shaders.into_inner().unwrap())
 }
 
 fn run(matches: &clap::ArgMatches) {
-    let (sender, receiver) = std::sync::mpsc::channel::<String>();
 
-    if let Err(err) = query(matches, sender.clone()) {
-        println!("Query failed: {}", err);
-        std::process::exit(1);
+    let built_shadertoy_shaders;
+
+    match query(matches) {
+        Ok(shaders) => built_shadertoy_shaders = shaders,
+        Err(err) => {
+            println!("Query failed: {}", err);
+            std::process::exit(1);
+        }
     }
 
     if !matches.is_present("headless") {
@@ -307,13 +335,8 @@ fn run(matches: &clap::ArgMatches) {
         let mut cursor_pos = (0.0f64, 0.0f64);
 
         let mut shadertoy_index = 0usize;
-        let mut built_shadertoy_shaders: Vec<String> = Vec::new();
 
         while running {
-
-            while let Ok(shader_source) = receiver.try_recv() {
-                built_shadertoy_shaders.push(shader_source);
-            }
 
             events_loop.poll_events(|event| match event {
                 winit::Event::WindowEvent { event: winit::WindowEvent::Closed, .. } => running = false,
@@ -401,6 +424,13 @@ fn main() {
                 .default_value("Popular")
                 .possible_values(&["Name", "Love", "Popular", "Newest", "Hot"])
                 .case_insensitive(true),
+        )
+        .arg(
+            Arg::with_name("threads")
+                .short("t")
+                .long("threads")
+                .help("How many threads to use for downloading & processing shaders. 0 = disables threading, -1 = use all logical processors")
+                .default_value("-1"),
         )
         .arg(
             Arg::with_name("headless")

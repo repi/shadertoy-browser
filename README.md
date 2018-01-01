@@ -25,6 +25,8 @@ OPTIONS:
     -f, --filter <filter>...    Inclusion filters [values: VR, SoundOutput, SoundInput, Webcam, MultiPass, MusicStream]
     -o, --order <order>         Sort order [default: Popular]  [values: Name, Love, Popular, Newest, Hot]
     -s, --search <string>       Search string to filter which shadertoys to get
+    -t, --threads <threads>     How many threads to use for downloading & processing shaders. 0 = disables threading, -1
+                                = use all logical processors [default: -1]
 ```
 
 To use the Rust shadertoy API directly in another app or library, check out the [`shadertoy`](https://crates.io/crates/shadertoy) crate, [docs](http://docs.rs/shadertoy) and [README](src/shadertoy/README.MD).
