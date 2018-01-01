@@ -5,9 +5,10 @@
 //! The API queries are done through the [`shadertoy`](https://crates.io/crates/shadertoy) crate, which can be found in  `src/shadertoy`
 
 #![allow(dead_code)]
+#![recursion_limit = "1024"] // `error_chain!` can recurse deeply
 
-extern crate shadertoy;
-
+#[macro_use]
+extern crate error_chain;
 #[macro_use]
 extern crate clap;
 
@@ -18,20 +19,19 @@ extern crate winit;
 extern crate rust_base58 as base58;
 extern crate serde_json;
 extern crate colored;
+extern crate reqwest;
+extern crate shadertoy;
 
-use colored::*;
-use clap::{Arg, App};
 use std::io::Write;
 use std::io::prelude::*;
 use std::fs::File;
 use std::path::{Path, PathBuf};
-use std::error::Error;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
+use clap::{Arg, App};   
 use rayon::prelude::*;
-
-//use chrono::prelude::*;
 use base58::ToBase58;
+use colored::*;
 
 mod render;
 use render::*;
@@ -50,27 +50,39 @@ extern crate cocoa;
 #[cfg(target_os = "macos")]
 use cocoa::foundation::NSAutoreleasePool;
 
-fn write_file(path: &Path, buf: &[u8]) {
-
-    match path.parent() {
-        Some(parent_path) => {
-            match std::fs::create_dir_all(parent_path) {
-                Err(why) => println!("couldn't create directory: {:?}", why.kind()),
-                Ok(_) => {}
-            }
+mod errors {
+    error_chain!{    
+        links {
+            Shadertoy(::shadertoy::Error, ::shadertoy::ErrorKind);
         }
-        _ => (),
-    }
+    
+        foreign_links {
+            Fmt(::std::fmt::Error);
+            Io(::std::io::Error);
+            Json(::serde_json::error::Error);
+            Clap(::clap::Error);
+            Reqwest(::reqwest::Error);
+        }
+    }            
+}
+use errors::*;
 
-    let mut file = match File::create(&path) {
-        Err(why) => panic!("couldn't create {:?}: {}", path, why.description()),
-        Ok(file) => file,
-    };
 
-    let _ = file.write_all(buf);
+fn write_file(path: &Path, buf: &[u8]) -> Result<()> {
+
+    if let Some(parent_path) = path.parent() {
+        match std::fs::create_dir_all(parent_path) {
+            Err(why) => println!("couldn't create directory: {:?}", why.kind()),
+            Ok(_) => {}
+        }
+    } 
+    
+    let mut file = File::create(&path)?;
+    file.write_all(buf)?;
+    Ok(())
 }
 
-fn search(client: &shadertoy::Client, matches: &clap::ArgMatches) -> Result<Vec<String>, Box<std::error::Error>> {
+fn search(client: &shadertoy::Client, matches: &clap::ArgMatches) -> Result<Vec<String>> {
 
     //use shadertoy::SearchFilter::FromStr;
     use std::str::FromStr;
@@ -96,26 +108,23 @@ fn search(client: &shadertoy::Client, matches: &clap::ArgMatches) -> Result<Vec<
 
     if let Ok(mut file) = File::open(&path) {
         let mut json_str = String::new();
-        file.read_to_string(&mut json_str)?;
+        file.read_to_string(&mut json_str).chain_err(|| "failed reading json shader file")?;
         let search_result: serde_json::Result<Vec<String>> = serde_json::from_str(&json_str);
-        match search_result {
-            Ok(r) => Ok(r),
-            Err(err) => Err(Box::new(err)),
-        }
+        search_result.chain_err(|| "shader query json deserialization failed")
     } else {
         // issue the actual request
         match client.search(search_params) {
             Ok(result) => {
                 // cache search results to a file on disk
-                write_file(&path, serde_json::to_string(&result)?.as_bytes());
+                write_file(&path, serde_json::to_string(&result)?.as_bytes())?;
                 Ok(result)
             }
-            Err(err) => Err(err),
+            Err(err) => Err(err.into()),
         }
     }
 }
 
-fn query(matches: &clap::ArgMatches) -> Result<Vec<String>, Box<std::error::Error>> {
+fn query(matches: &clap::ArgMatches) -> Result<Vec<String>> {
 
     let api_key = matches.value_of("apikey").unwrap();
     let client = shadertoy::Client::new(api_key);
@@ -133,7 +142,7 @@ fn query(matches: &clap::ArgMatches) -> Result<Vec<String>, Box<std::error::Erro
         let index = AtomicUsize::new(0);
         let built_count = AtomicUsize::new(0);
 
-        let process_shadertoy = |shadertoy| -> Result<(),Box<std::error::Error>> {
+        let process_shadertoy = |shadertoy| -> Result<()> {
 
             let path = PathBuf::from(format!("output/shader/{}.json", shadertoy));
 
@@ -141,7 +150,7 @@ fn query(matches: &clap::ArgMatches) -> Result<Vec<String>, Box<std::error::Erro
 
             if !path.exists() {
                 shader = client.get_shader(shadertoy)?;
-                write_file(&path, serde_json::to_string_pretty(&shader)?.as_bytes());
+                write_file(&path, serde_json::to_string_pretty(&shader)?.as_bytes())?;
             } else {
                 let mut json_str = String::new();
                 File::open(&path)?.read_to_string(&mut json_str)?;
@@ -203,14 +212,14 @@ fn query(matches: &clap::ArgMatches) -> Result<Vec<String>, Box<std::error::Erro
 
                 // save out the source GLSL file, for debugging
                 let glsl_path = PathBuf::from(format!("output/shader/{} {}.glsl", shadertoy, pass.name));
-                write_file(&glsl_path, full_source.as_bytes());
+                write_file(&glsl_path, full_source.as_bytes())?;
 
                 #[cfg(target_os = "macos")]
                 match convert_glsl_to_metal(glsl_path.to_str().unwrap(), "main", full_source.as_str()) {
                     Ok(full_source_metal) => {
                         // save out the generated Metal file, for debugging
                         let msl_path = PathBuf::from(format!("output/shader/{} {}.metal", shadertoy, pass.name));
-                        write_file(&msl_path, full_source_metal.as_bytes());
+                        write_file(&msl_path, full_source_metal.as_bytes())?;
                     
                         if pass.pass_type == "image" && pass.inputs.len() == 0 {
                             
@@ -246,7 +255,7 @@ fn query(matches: &clap::ArgMatches) -> Result<Vec<String>, Box<std::error::Erro
 
                         println!("Asset downloaded: {}, {} bytes", input.src, data.len());
 
-                        write_file(&path, &data);
+                        write_file(&path, &data)?;
                     } else {
 
                     /*
@@ -278,8 +287,9 @@ fn query(matches: &clap::ArgMatches) -> Result<Vec<String>, Box<std::error::Erro
         else 
         {
             if threads > 1 {
-                rayon::initialize(rayon::Configuration::new()
-                    .num_threads(threads as usize))?;
+                if let Err(_err) = rayon::initialize(rayon::Configuration::new().num_threads(threads as usize)) {
+                    bail!("rayon initialization failed");
+                }
             }
 
             shadertoys.par_iter().for_each(|shadertoy| {
@@ -293,9 +303,66 @@ fn query(matches: &clap::ArgMatches) -> Result<Vec<String>, Box<std::error::Erro
     Ok(built_shaders.into_inner().unwrap())
 }
 
-fn run(matches: &clap::ArgMatches) -> Result<(), Box<std::error::Error>> {
+fn run() -> Result<()> {
 
-    let built_shadertoy_shaders = query(matches)?;
+    let matches = App::new("Shadertoy Browser")
+        .version(crate_version!())
+        .author("Johan Andersson <repi@repi.se>")
+        .about("Downloads shadertoys as json files") // TODO update about
+        .arg(
+            Arg::with_name("apikey")
+                .short("k")
+                .long("apikey")
+                .value_name("key")
+                .default_value("BtHtWD") // be nice and have a default key so app just works
+                .help("Set shadertoy API key to use. Create your key on https://www.shadertoy.com/myapps")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("search")
+                .short("s")
+                .long("search")
+                .value_name("string")
+                .help("Search string to filter which shadertoys to get")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("filter")
+                .short("f")
+                .long("filter")
+                .help("Inclusion filters")
+                .takes_value(true)
+                .multiple(true)
+                .possible_values(&["VR", "SoundOutput", "SoundInput", "Webcam", "MultiPass", "MusicStream"])
+                .case_insensitive(true),
+        )
+        .arg(
+            Arg::with_name("order")
+                .short("o")
+                .long("order")
+                .help("Sort order")
+                .takes_value(true)
+                .default_value("Popular")
+                .possible_values(&["Name", "Love", "Popular", "Newest", "Hot"])
+                .case_insensitive(true),
+        )
+        .arg(
+            Arg::with_name("threads")
+                .short("t")
+                .long("threads")
+                .help("How many threads to use for downloading & processing shaders. 0 = disables threading, -1 = use all logical processors")
+                .default_value("-1"),
+        )
+        .arg(
+            Arg::with_name("headless")
+                .short("h")
+                .long("headless")
+                .help("Don't render, only download shadertoys"),
+        )
+        .get_matches();
+
+
+    let built_shadertoy_shaders = query(&matches).chain_err(|| "query for shaders failed")?;
 
     if !matches.is_present("headless") {
 
@@ -303,7 +370,8 @@ fn run(matches: &clap::ArgMatches) -> Result<(), Box<std::error::Error>> {
         let window = winit::WindowBuilder::new()
             .with_dimensions(1024, 768)
             .with_title("Shadertoy Browser".to_string())
-            .build(&events_loop)?;
+            .build(&events_loop)
+            .chain_err(|| "error creating window")?;
 
         let render_backend: Option<Box<RenderBackend>>;
 
@@ -313,7 +381,7 @@ fn run(matches: &clap::ArgMatches) -> Result<(), Box<std::error::Error>> {
             render_backend = None;
         }
 
-        let mut render_backend = render_backend.expect("No renderer available");
+        let mut render_backend = render_backend.chain_err(|| "no renderer available")?;
         render_backend.init_window(&window);
 
 
@@ -387,64 +455,13 @@ fn run(matches: &clap::ArgMatches) -> Result<(), Box<std::error::Error>> {
 }
 
 fn main() {
-    let matches = App::new("Shadertoy Browser")
-        .version(crate_version!())
-        .author("Johan Andersson <repi@repi.se>")
-        .about("Downloads shadertoys as json files") // TODO update about
-        .arg(
-            Arg::with_name("apikey")
-                .short("k")
-                .long("apikey")
-                .value_name("key")
-                .default_value("BtHtWD") // be nice and have a default key so app just works
-                .help("Set shadertoy API key to use. Create your key on https://www.shadertoy.com/myapps")
-                .takes_value(true),
-        )
-        .arg(
-            Arg::with_name("search")
-                .short("s")
-                .long("search")
-                .value_name("string")
-                .help("Search string to filter which shadertoys to get")
-                .takes_value(true),
-        )
-        .arg(
-            Arg::with_name("filter")
-                .short("f")
-                .long("filter")
-                .help("Inclusion filters")
-                .takes_value(true)
-                .multiple(true)
-                .possible_values(&["VR", "SoundOutput", "SoundInput", "Webcam", "MultiPass", "MusicStream"])
-                .case_insensitive(true),
-        )
-        .arg(
-            Arg::with_name("order")
-                .short("o")
-                .long("order")
-                .help("Sort order")
-                .takes_value(true)
-                .default_value("Popular")
-                .possible_values(&["Name", "Love", "Popular", "Newest", "Hot"])
-                .case_insensitive(true),
-        )
-        .arg(
-            Arg::with_name("threads")
-                .short("t")
-                .long("threads")
-                .help("How many threads to use for downloading & processing shaders. 0 = disables threading, -1 = use all logical processors")
-                .default_value("-1"),
-        )
-        .arg(
-            Arg::with_name("headless")
-                .short("h")
-                .long("headless")
-                .help("Don't render, only download shadertoys"),
-        )
-        .get_matches();
+    if let Err(ref e) = run() {
+        use std::io::Write;
+        use error_chain::ChainedError; // trait which holds `display_chain`
+        let stderr = &mut ::std::io::stderr();
+        let errmsg = "Error writing to stderr";
 
-    if let Err(err) = run(&matches) {
-        println!("Error: {}", err);
-        std::process::exit(1);        
+        writeln!(stderr, "{}", e.display_chain()).expect(errmsg);
+        ::std::process::exit(1);
     }
 }

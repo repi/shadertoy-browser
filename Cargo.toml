@@ -31,6 +31,8 @@ libc = "0.2.34"
 foreign-types = "0.3.2"
 rust-base58 = "0.0.4"
 colored = "1.6"
+reqwest = "0.8.2"
+error-chain = "0.11.0"
 shadertoy = { path = "src/shadertoy", version = "0.3" }
 
 [target.'cfg(target_os = "macos")'.dependencies]

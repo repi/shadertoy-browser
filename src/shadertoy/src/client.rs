@@ -1,11 +1,9 @@
-#![allow(dead_code)]
-
-extern crate reqwest;
-extern crate serde_json;
-
+use reqwest;
+use serde_json;
 use std;
 use std::str::FromStr;
 use types::*;
+use errors::*;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Copy, Clone)]
 pub enum SearchSortOrder {
@@ -46,7 +44,7 @@ pub struct Client {
 impl FromStr for SearchSortOrder {
     type Err = ();
 
-    fn from_str(s: &str) -> Result<SearchSortOrder, ()> {
+    fn from_str(s: &str) -> std::result::Result<SearchSortOrder,()> {
         match s {
             "Name" => Ok(SearchSortOrder::Name),
             "Love" => Ok(SearchSortOrder::Love),
@@ -61,7 +59,7 @@ impl FromStr for SearchSortOrder {
 impl FromStr for SearchFilter {
     type Err = ();
 
-    fn from_str(s: &str) -> Result<SearchFilter, ()> {
+    fn from_str(s: &str) -> std::result::Result<SearchFilter,()> {
         match s {
             "VR" => Ok(SearchFilter::Vr),
             "SoundOutput" => Ok(SearchFilter::SoundOutput),
@@ -85,7 +83,7 @@ impl Client {
     }
 
     /// Issues a search query for shadertoys.
-    pub fn search(&self, params: SearchParams) -> Result<Vec<String>, Box<std::error::Error>> {
+    pub fn search(&self, params: SearchParams) -> Result<Vec<String>> {
 
         let query_str = format!("https://www.shadertoy.com/api/v1/shaders{}?sort={}&{}key={}", 
             match params.string.is_empty() {
@@ -111,11 +109,11 @@ impl Client {
 
         match search_result {
             Ok(r) => Ok(r.results),
-            Err(err) => Err(Box::new(err)),
+            Err(err) => Err(err.into()),
         }
     }
 
-    pub fn get_shader(&self, shader_id: &str) -> Result<Shader, Box<std::error::Error>> {
+    pub fn get_shader(&self, shader_id: &str) -> Result<Shader> {
 
         let json_str = self.rest_client
             .get(&format!("https://www.shadertoy.com/api/v1/shaders/{}?key={}", shader_id, self.api_key))
@@ -132,7 +130,7 @@ impl Client {
 
         match shader_result {
             Ok(r) => Ok(r.shader),
-            Err(err) => Err(Box::new(err)),
+            Err(err) => Err(err.into()),
         }
     }
 }
