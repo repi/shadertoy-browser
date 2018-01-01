@@ -101,15 +101,29 @@ impl Client {
 
         #[derive(Serialize, Deserialize, Debug)]
         struct SearchResult {
+            #[serde(default)]
+            #[serde(rename = "Error")]
+            error: String,
+            
+            #[serde(default)]
+            #[serde(rename = "Shaders")]
+            shaders: u64,
+            
+            #[serde(default)]
             #[serde(rename = "Results")]
             results: Vec<String>,
         }
 
-        let search_result: serde_json::Result<SearchResult> = serde_json::from_str(&json_str);
-
-        match search_result {
-            Ok(r) => Ok(r.results),
-            Err(err) => Err(err.into()),
+        match serde_json::from_str::<SearchResult>(&json_str) {
+            Ok(r) => {
+                if !r.error.is_empty() {
+                    bail!("Shadertoy REST search query returned error: {}", r.error);
+                }
+                return Ok(r.results);
+            },
+            Err(err) => {
+                return Err(Error::from(err)).chain_err(|| "JSON parsing of Shadertoy search result failed");
+            }
         }
     }
 
@@ -122,15 +136,24 @@ impl Client {
 
         #[derive(Serialize, Deserialize, Debug)]
         struct ShaderRoot {
+            #[serde(default)]
+            #[serde(rename = "Error")]
+            error: String,
+
             #[serde(rename = "Shader")]
             shader: Shader,
         }
 
-        let shader_result: serde_json::Result<ShaderRoot> = serde_json::from_str(&json_str);
-
-        match shader_result {
-            Ok(r) => Ok(r.shader),
-            Err(err) => Err(err.into()),
+        match serde_json::from_str::<ShaderRoot>(&json_str) {
+            Ok(r) => {
+                if !r.error.is_empty() {
+                    bail!("Shadertoy REST shader query returned error: {}", r.error);
+                }
+                return Ok(r.shader);
+            },
+            Err(err) => {
+                return Err(Error::from(err)).chain_err(|| "JSON parsing of Shadertoy shader rootfailed");
+            }
         }
     }
 }

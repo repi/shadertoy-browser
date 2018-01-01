@@ -113,7 +113,7 @@ fn search(client: &shadertoy::Client, matches: &clap::ArgMatches) -> Result<Vec<
         search_result.chain_err(|| "shader query json deserialization failed")
     } else {
         // issue the actual request
-        match client.search(search_params) {
+        match client.search(search_params).chain_err(|| "shadertoy search failed") {
             Ok(result) => {
                 // cache search results to a file on disk
                 write_file(&path, serde_json::to_string(&result)?.as_bytes())?;
@@ -363,6 +363,10 @@ fn run() -> Result<()> {
 
 
     let built_shadertoy_shaders = query(&matches).chain_err(|| "query for shaders failed")?;
+
+    if built_shadertoy_shaders.len() == 0 {
+        return Ok(());
+    }
 
     if !matches.is_present("headless") {
 

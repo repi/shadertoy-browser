@@ -15,7 +15,11 @@ fn test_query() {
     assert!(query.len() > 0);
 
     // get the first shader in the list
-
     let shader = client.get_shader(&query[0]).unwrap();
     assert!(shader.renderpass.len() > 0);
+
+
+    // try getting a random shader, this should fail
+    let shader = client.get_shader("doesnt_exist");
+    assert!(shader.is_err());
 }
