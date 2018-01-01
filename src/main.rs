@@ -17,7 +17,9 @@ extern crate rayon;
 extern crate winit;
 extern crate rust_base58 as base58;
 extern crate serde_json;
+extern crate colored;
 
+use colored::*;
 use clap::{Arg, App};
 use std::io::Write;
 use std::io::prelude::*;
@@ -87,7 +89,7 @@ fn search(client: &shadertoy::Client, matches: &clap::ArgMatches) -> Result<Vec<
         },
    };
 
-    println!("Search parameters: {:?}", search_params);
+    println!("{:?}", search_params);
 
     // check if we can find a cached search on disk
 
@@ -147,12 +149,12 @@ fn query(matches: &clap::ArgMatches, sender: std::sync::mpsc::Sender<String>) ->
             shader = serde_json::from_str(&json_str)?;
         }
 
-        println!("({} / {}): {} - \"{}\" by {}, {} views, {} likes", 
+        println!("({} / {}) {} - {} by {}, {} views, {} likes", 
             index.fetch_add(1, Ordering::SeqCst), 
             shadertoys_len, 
             shadertoy,
-            shader.info.name, 
-            shader.info.username,
+            shader.info.name.green(), 
+            shader.info.username.blue(),
             shader.info.viewed,
             shader.info.likes);
 
