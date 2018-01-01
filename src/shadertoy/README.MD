@@ -11,7 +11,7 @@ Rust library wrapping the [Shadertoy REST API](http://shadertoy.com/api) to be a
 
 ```toml
 [dependencies]
-shadertoy = "0.1"
+shadertoy = "0.3"
 ```
 
 TODO
