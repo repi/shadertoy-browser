@@ -424,6 +424,9 @@ fn run() -> Result<()> {
                         }
                     }
                 }
+                winit::Event::WindowEvent { event: winit::WindowEvent::Resized { .. }, .. } => {
+                    render_backend.init_window(&window);        
+                }
                 _ => (),
             });
 
