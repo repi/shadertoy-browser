@@ -37,4 +37,4 @@ shadertoy = { path = "src/shadertoy", version = "0.1" }
 cocoa = "0.13.0"
 objc = "0.2.2"
 objc-foundation = "0.1.1"
-metal-rs = { git = "https://github.com/gfx-rs/metal-rs.git", branch = "master" }
+metal-rs = "0.6.1"
