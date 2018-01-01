@@ -138,7 +138,7 @@ fn query(matches: &clap::ArgMatches, sender: std::sync::mpsc::Sender<String>) ->
 
         let path = PathBuf::from(format!("output/shader/{}.json", shadertoy));
 
-        let mut shader;
+        let shader;
 
         if !path.exists() {
             shader = client.get_shader(shadertoy)?;
@@ -287,11 +287,12 @@ fn run(matches: &clap::ArgMatches) {
             .build(&events_loop)
             .unwrap();
 
-        let mut render_backend: Option<Box<RenderBackend>> = None;
+        let render_backend: Option<Box<RenderBackend>>;
 
-        #[cfg(target_os = "macos")]
-        {
+        if cfg!(target_os = "macos") {
             render_backend = Some(Box::new(MetalRenderBackend::new()));
+        } else {
+            render_backend = None;
         }
 
         let mut render_backend = render_backend.expect("No renderer available");
