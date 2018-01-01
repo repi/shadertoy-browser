@@ -4,6 +4,7 @@ extern crate reqwest;
 extern crate serde_json;
 
 use std;
+use std::str::FromStr;
 use types::*;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Copy, Clone)]
@@ -42,6 +43,37 @@ pub struct Client {
     pub rest_client: reqwest::Client,
 }
 
+impl FromStr for SearchSortOrder {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<SearchSortOrder, ()> {
+        match s {
+            "Name" => Ok(SearchSortOrder::Name),
+            "Love" => Ok(SearchSortOrder::Love),
+            "Popular" => Ok(SearchSortOrder::Popular),
+            "Newest" => Ok(SearchSortOrder::Newest),
+            "Hot" => Ok(SearchSortOrder::Hot),
+            _ => Err(()),
+        }
+    }
+}
+
+impl FromStr for SearchFilter {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<SearchFilter, ()> {
+        match s {
+            "VR" => Ok(SearchFilter::Vr),
+            "SoundOutput" => Ok(SearchFilter::SoundOutput),
+            "SoundInput" => Ok(SearchFilter::SoundInput),
+            "Webcam" => Ok(SearchFilter::Webcam),
+            "MultiPass" => Ok(SearchFilter::MultiPass),
+            "MusicStream" => Ok(SearchFilter::MusicStream),
+            _ => Err(()),
+        }
+    }
+}
+
 impl Client {
     /// Create a new client.
     /// This requires sending in an API key, one can generate one on https://www.shadertoy.com/profile
@@ -60,24 +92,12 @@ impl Client {
                 false => format!("/query/{}", params.string),
                 true => String::from(""),
             },
-            match params.sort_order {
-                SearchSortOrder::Name => "name",
-                SearchSortOrder::Love => "love",
-                SearchSortOrder::Popular => "popular",
-                SearchSortOrder::Newest => "newest",
-                SearchSortOrder::Hot => "hot",
-            },
-            params.filters.iter().map(|f| format!("filter={}&", match *f {
-                SearchFilter::Vr => "vr",
-                SearchFilter::SoundOutput => "soundoutput",
-                SearchFilter::SoundInput => "soundinput",
-                SearchFilter::Webcam => "webcam",
-                SearchFilter::MultiPass => "multipass",
-                SearchFilter::MusicStream => "musicstream",            
-            })).collect::<String>(),
+            format!("{:?}", params.sort_order).to_lowercase(),
+            params.filters.iter().map(|f| 
+                format!("filter={:?}&", f).to_lowercase()).collect::<String>(),
             self.api_key);
 
-        //println!("{}", &query_str);
+        println!("{}", &query_str);
 
         let json_str = self.rest_client.get(&query_str).send()?.text()?;
 
