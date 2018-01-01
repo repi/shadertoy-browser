@@ -68,18 +68,28 @@ fn write_file(path: &Path, buf: &[u8]) {
     let _ = file.write_all(buf);
 }
 
-fn search(client: &shadertoy::Client, search_str: Option<&str>) -> Result<Vec<String>, Box<std::error::Error>> {
 
-    // check if we can find a cached search on disk
+fn search(client: &shadertoy::Client, matches: &clap::ArgMatches) -> Result<Vec<String>, Box<std::error::Error>> {
+
+    //use shadertoy::SearchFilter::FromStr;
+    use std::str::FromStr;
+
+    // create search parameters
 
     let search_params = shadertoy::SearchParams {
-        string: match search_str {
-            Some(string) => string,
-            None => "",
+        string: matches.value_of("search").unwrap_or(""),
+        
+        sort_order: value_t!(matches, "order", shadertoy::SearchSortOrder)?,
+
+        filters: match matches.values_of("filter") {
+            Some(args) => args.map(|f| shadertoy::SearchFilter::from_str(f).unwrap()).collect(),
+            None => vec![],
         },
-        sort_order: shadertoy::SearchSortOrder::Love,
-        filters: vec![],
-    };
+   };
+
+    println!("Search parameters: {:?}", search_params);
+
+    // check if we can find a cached search on disk
 
     let path = PathBuf::from(&format!("output/query/{}", serde_json::to_string(&search_params)?.as_bytes().to_base58()));
 
@@ -104,11 +114,12 @@ fn search(client: &shadertoy::Client, search_str: Option<&str>) -> Result<Vec<St
     }
 }
 
-fn query(api_key: &str, search_str: Option<&str>, sender: std::sync::mpsc::Sender<String>) -> Result<(), Box<std::error::Error>> {
+fn query(matches: &clap::ArgMatches, sender: std::sync::mpsc::Sender<String>) -> Result<(), Box<std::error::Error>> {
 
+    let api_key = matches.value_of("apikey").unwrap();
     let client = shadertoy::Client::new(api_key);
 
-    let shadertoys = search(&client, search_str)?;
+    let shadertoys = search(&client, matches)?;
 
     let shadertoys_len = shadertoys.len();
 
@@ -260,10 +271,7 @@ fn query(api_key: &str, search_str: Option<&str>, sender: std::sync::mpsc::Sende
 fn run(matches: &clap::ArgMatches) {
     let (sender, receiver) = std::sync::mpsc::channel::<String>();
 
-    let api_key = matches.value_of("apikey").unwrap();
-    let search_str = matches.value_of("search");
-
-    if let Err(err) = query(api_key, search_str, sender.clone()) {
+    if let Err(err) = query(matches, sender.clone()) {
         println!("Query failed: {}", err);
         std::process::exit(1);
     }
@@ -353,7 +361,7 @@ fn main() {
     let matches = App::new("Shadertoy Browser")
         .version(crate_version!())
         .author("Johan Andersson <repi@repi.se>")
-        .about("Downloads shadertoys as json files")
+        .about("Downloads shadertoys as json files") // TODO update about
         .arg(
             Arg::with_name("apikey")
                 .short("k")
@@ -367,9 +375,29 @@ fn main() {
             Arg::with_name("search")
                 .short("s")
                 .long("search")
-                .value_name("stringy")
+                .value_name("string")
                 .help("Search string to filter which shadertoys to get")
                 .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("filter")
+                .short("f")
+                .long("filter")
+                .help("Inclusion filters")
+                .takes_value(true)
+                .multiple(true)
+                .possible_values(&["VR", "SoundOutput", "SoundInput", "Webcam", "MultiPass", "MusicStream"])
+                .case_insensitive(true),
+        )
+        .arg(
+            Arg::with_name("order")
+                .short("o")
+                .long("order")
+                .help("Sort order")
+                .takes_value(true)
+                .default_value("Popular")
+                .possible_values(&["Name", "Love", "Popular", "Newest", "Hot"])
+                .case_insensitive(true),
         )
         .arg(
             Arg::with_name("headless")
