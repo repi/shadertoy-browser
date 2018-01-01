@@ -136,12 +136,13 @@ fn query(api_key: &str, search_str: Option<&str>, sender: std::sync::mpsc::Sende
             shader = serde_json::from_str(&json_str)?;
         }
 
-        println!("({} / {}): {} - \"{}\" by {}, {} likes", 
+        println!("({} / {}): {} - \"{}\" by {}, {} views, {} likes", 
             index.fetch_add(1, Ordering::SeqCst), 
             shadertoys_len, 
             shadertoy,
             shader.info.name, 
             shader.info.username,
+            shader.info.viewed,
             shader.info.likes);
 
         let mut success = true;
