@@ -70,7 +70,6 @@ fn write_file(path: &Path, buf: &[u8]) {
     let _ = file.write_all(buf);
 }
 
-
 fn search(client: &shadertoy::Client, matches: &clap::ArgMatches) -> Result<Vec<String>, Box<std::error::Error>> {
 
     //use shadertoy::SearchFilter::FromStr;
@@ -294,17 +293,9 @@ fn query(matches: &clap::ArgMatches) -> Result<Vec<String>, Box<std::error::Erro
     Ok(built_shaders.into_inner().unwrap())
 }
 
-fn run(matches: &clap::ArgMatches) {
+fn run(matches: &clap::ArgMatches) -> Result<(), Box<std::error::Error>> {
 
-    let built_shadertoy_shaders;
-
-    match query(matches) {
-        Ok(shaders) => built_shadertoy_shaders = shaders,
-        Err(err) => {
-            println!("Query failed: {}", err);
-            std::process::exit(1);
-        }
-    }
+    let built_shadertoy_shaders = query(matches)?;
 
     if !matches.is_present("headless") {
 
@@ -312,8 +303,7 @@ fn run(matches: &clap::ArgMatches) {
         let window = winit::WindowBuilder::new()
             .with_dimensions(1024, 768)
             .with_title("Shadertoy Browser".to_string())
-            .build(&events_loop)
-            .unwrap();
+            .build(&events_loop)?;
 
         let render_backend: Option<Box<RenderBackend>>;
 
@@ -336,7 +326,7 @@ fn run(matches: &clap::ArgMatches) {
 
         let mut shadertoy_index = 0usize;
         let mut prev_shadertoy_index = 1usize;
-
+        
 
         while running {
 
@@ -392,6 +382,8 @@ fn run(matches: &clap::ArgMatches) {
             }
         }
     }
+
+    Ok(())
 }
 
 fn main() {
@@ -451,5 +443,8 @@ fn main() {
         )
         .get_matches();
 
-    run(&matches);
+    if let Err(err) = run(&matches) {
+        println!("Error: {}", err);
+        std::process::exit(1);        
+    }
 }
