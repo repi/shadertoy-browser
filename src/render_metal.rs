@@ -25,6 +25,14 @@ use floating_duration::TimeAsFloat;
 use chrono::prelude::*;
 
 use render::*;
+use errors::*;
+
+struct MetalRenderPipeline {
+    pipeline_state: metal::RenderPipelineState,
+}
+
+impl MetalRenderPipeline {
+}
 
 pub struct MetalRenderBackend {
     device: metal::Device,
@@ -35,10 +43,8 @@ pub struct MetalRenderBackend {
     time: Instant,
     time_last_frame: Instant,
 
-    shader_source: String,
-    pipeline_state: Option<metal::RenderPipelineState>,
+    pipelines: Vec<MetalRenderPipeline>
 }
-
 
 impl MetalRenderBackend {
     pub fn new() -> MetalRenderBackend {
@@ -53,12 +59,11 @@ impl MetalRenderBackend {
             frame_index: 0,
             time: Instant::now(),
             time_last_frame: Instant::now(),
-            shader_source: String::new(),
-            pipeline_state: None,
+            pipelines: vec![],
         }
     }
 
-    fn create_pipeline_state(&self, shader_source: &str) -> Result<metal::RenderPipelineState, String> {
+    fn create_pipeline_state(&self, shader_source: &str) -> Result<metal::RenderPipelineState> {
         let compile_options = metal::CompileOptions::new();
 
         let vs_source = include_str!("shadertoy_vs.metal");
@@ -84,25 +89,6 @@ impl MetalRenderBackend {
 
         //return self.device.new_render_pipeline_state(&pipeline_desc);
         return new_render_pipeline_state(&self.device, &pipeline_desc);
-    }
-
-    fn update_shader(&mut self, shader_source: &str) {
-
-        if shader_source == self.shader_source {
-            return;
-        }
-
-        self.shader_source = shader_source.to_string();
-
-        self.pipeline_state = match self.create_pipeline_state(shader_source) {
-            Ok(pipeline_state) => Some(pipeline_state),
-            Err(string) => {
-                if self.shader_source.len() > 0 {
-                    println!("Error creating pipeline state: {}", string);
-                }
-                None
-            }
-        }
     }
 }
 
@@ -132,8 +118,6 @@ impl RenderBackend for MetalRenderBackend {
     }
 
     fn present(&mut self, params: RenderParams) {
-
-        self.update_shader(&params.shader_source);
 
         //println!("frame: {}", self.frame_index);
 
@@ -191,8 +175,10 @@ impl RenderBackend for MetalRenderBackend {
                 let parallel_encoder = command_buffer.new_parallel_render_command_encoder(&render_pass_descriptor);
                 let encoder = parallel_encoder.render_command_encoder();
 
-                if let Some(ref pipeline_state) = self.pipeline_state {
-                    encoder.set_render_pipeline_state(&pipeline_state);
+                if let Some(pipeline_handle) = params.pipeline {
+                    let pipeline = &self.pipelines[pipeline_handle];
+
+                    encoder.set_render_pipeline_state(&pipeline.pipeline_state);
                     encoder.set_cull_mode(metal::MTLCullMode::None);
 
                     let constants_ptr: *const ShadertoyConstants = &constants;
@@ -213,12 +199,29 @@ impl RenderBackend for MetalRenderBackend {
             }
         }
     }
+
+    fn new_pipeline(&mut self, shader_source: &str) -> Result<RenderPipelineHandle> {
+
+        let metal_source = convert_glsl_to_metal("unknown name", "main", shader_source)?;
+
+        // save out the generated Metal file, for debugging
+        // let msl_path = PathBuf::from(format!("output/shader/{} {}.metal", shadertoy, pass.name));
+        // write_file(&msl_path, full_source_metal.as_bytes())?;
+
+        let pipeline = MetalRenderPipeline {
+            pipeline_state: self.create_pipeline_state(&metal_source)?,
+        };
+
+        self.pipelines.push(pipeline);
+
+        Ok(self.pipelines.len()-1 as RenderPipelineHandle)
+    }
 }
 
 // manually created version as the one in metal-rs will fail and return Err
 // for shaders that just have compilation warnings
 // TODO should figure out how to resolve this properly and merge it back?
-fn new_library_with_source(device: &metal::Device, src: &str, options: &metal::CompileOptionsRef) -> Result<metal::Library, String> {
+fn new_library_with_source(device: &metal::Device, src: &str, options: &metal::CompileOptionsRef) -> Result<metal::Library> {
     use cocoa::foundation::NSString as cocoa_NSString;
     use cocoa::base::nil as cocoa_nil;
 
@@ -236,7 +239,7 @@ fn new_library_with_source(device: &metal::Device, src: &str, options: &metal::C
         // TODO right now we just return Ok if a library is built, and ignore the warnings
         // would be ideal to be able to report out warnings even for successful builds though
         if !library.is_null() {
-            return Result::Ok(metal::Library::from_ptr(library));
+            return Ok(metal::Library::from_ptr(library));
         }
 
         if !err.is_null() {
@@ -245,10 +248,10 @@ fn new_library_with_source(device: &metal::Device, src: &str, options: &metal::C
             let message = CStr::from_ptr(compile_error).to_string_lossy().into_owned();
             // original code crashes due to this release when having error message
             //msg_send![err, release];
-            return Err(message);
+            return Err(message.into());
         }
 
-        return Err(String::from("unreachable?"));
+        return Err("unreachable?".into());
     }
 }
 
@@ -265,7 +268,7 @@ macro_rules! try_objc {
                 let message = CStr::from_ptr(compile_error).to_string_lossy().into_owned();
                 // original code crashes due to this release when having error message
                 //msg_send![$err_name, release];
-                return Err(message);
+                return Err(message.into());
             }
             value
         }
@@ -278,7 +281,7 @@ macro_rules! try_objc {
 fn new_render_pipeline_state(
     device: &metal::Device,
     descriptor: &metal::RenderPipelineDescriptorRef,
-) -> Result<metal::RenderPipelineState, String> {
+) -> Result<metal::RenderPipelineState> {
     unsafe {
         let pipeline_state: *mut metal::MTLRenderPipelineState =
             try_objc!{ err =>
@@ -289,27 +292,22 @@ fn new_render_pipeline_state(
         // This is the check that is new here
         // apparently there are cases where an error message is not returned but null is
         if pipeline_state.is_null() {
-            return Err(String::from("newRenderPipelineStateWithDescriptor returned null"));
+            return Err("newRenderPipelineStateWithDescriptor returned null".into());
         }
 
         Ok(metal::RenderPipelineState::from_ptr(pipeline_state))
     }
 }
 
-pub fn convert_glsl_to_metal(name: &str, entry_point: &str, source: &str) -> Result<String, String> {
+fn convert_glsl_to_metal(name: &str, entry_point: &str, source: &str) -> Result<String> {
 
     // convert to SPIR-V using shaderc
 
     let mut compiler = shaderc::Compiler::new().unwrap();
     let options = shaderc::CompileOptions::new().unwrap();
 
-    let binary_result = match compiler.compile_into_spirv(source, shaderc::ShaderKind::Fragment, name, entry_point, Some(&options)) {
-
-        Ok(result) => result,
-        Err(err) => {
-            return Err(format!("shaderc compilation failed: {}", err));
-        }
-    };
+    let binary_result = compiler.compile_into_spirv(source, shaderc::ShaderKind::Fragment, name, entry_point, Some(&options))
+        .chain_err(|| "shaderc compilation to SPIRV failed")?;
 
     // convert SPIR-V to MSL
 
@@ -319,12 +317,14 @@ pub fn convert_glsl_to_metal(name: &str, entry_point: &str, source: &str) -> Res
 
     let mut ast = spirv::Ast::<msl::Target>::parse(&module).unwrap();
 
+//    ast.compile().chain_err(|| "spirv-cross compilation failed")?
+
     match ast.compile() {
         Ok(str) => Ok(str),
         Err(e) => {
             match e {
-                spirv_cross::ErrorCode::Unhandled => Err(String::from("spirv-cross handled error")),
-                spirv_cross::ErrorCode::CompilationError(str) => Err(format!("spirv-cross error: {}", str)),
+                spirv_cross::ErrorCode::Unhandled => Err("spirv-cross handled error".into()),
+                spirv_cross::ErrorCode::CompilationError(str) => Err(format!("spirv-cross error: {}", str).into()),
             }
         }
     }

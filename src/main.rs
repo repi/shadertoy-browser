@@ -68,6 +68,16 @@ mod errors {
 use errors::*;
 
 
+struct BuiltShadertoy {
+
+    info: shadertoy::ShaderInfo,
+
+    shader_source: String,
+    pipeline: Option<RenderPipelineHandle>,
+    pipeline_failed: bool,
+}
+
+
 fn write_file(path: &Path, buf: &[u8]) -> Result<()> {
 
     if let Some(parent_path) = path.parent() {
@@ -124,7 +134,7 @@ fn search(client: &shadertoy::Client, matches: &clap::ArgMatches) -> Result<Vec<
     }
 }
 
-fn query(matches: &clap::ArgMatches) -> Result<Vec<String>> {
+fn download(matches: &clap::ArgMatches) -> Result<Vec<BuiltShadertoy>> {
 
     let api_key = matches.value_of("apikey").unwrap();
     let client = shadertoy::Client::new(api_key);
@@ -134,13 +144,12 @@ fn query(matches: &clap::ArgMatches) -> Result<Vec<String>> {
     let shadertoys_len = shadertoys.len();
     println!("found {} shadertoys", shadertoys_len);
 
-    let built_shaders = Mutex::new(Vec::<String>::new());
+    let built_shadertoys = Mutex::new(Vec::<BuiltShadertoy>::new());
 
     {
         // closure for processing a shadertoy
     
         let index = AtomicUsize::new(0);
-        let built_count = AtomicUsize::new(0);
 
         let process_shadertoy = |shadertoy| -> Result<()> {
 
@@ -165,8 +174,6 @@ fn query(matches: &clap::ArgMatches) -> Result<Vec<String>> {
                 shader.info.username.blue(),
                 shader.info.viewed,
                 shader.info.likes);
-
-            let mut success = true;
 
             for pass in shader.renderpass.iter() {
 
@@ -214,25 +221,17 @@ fn query(matches: &clap::ArgMatches) -> Result<Vec<String>> {
                 let glsl_path = PathBuf::from(format!("output/shader/{} {}.glsl", shadertoy, pass.name));
                 write_file(&glsl_path, full_source.as_bytes())?;
 
-                #[cfg(target_os = "macos")]
-                match convert_glsl_to_metal(glsl_path.to_str().unwrap(), "main", full_source.as_str()) {
-                    Ok(full_source_metal) => {
-                        // save out the generated Metal file, for debugging
-                        let msl_path = PathBuf::from(format!("output/shader/{} {}.metal", shadertoy, pass.name));
-                        write_file(&msl_path, full_source_metal.as_bytes())?;
-                    
-                        if pass.pass_type == "image" && pass.inputs.len() == 0 {
-                            
-                            let mut shaders = built_shaders.lock().unwrap();
-                            shaders.push(full_source_metal);
-                        }
-                    }
-                    Err(string) => {
-                        success = false;
-                        println!("Failed compiling shader {}: {}", glsl_path.to_str().unwrap(), string);
-                    }
-                }
+                if pass.pass_type == "image" && pass.inputs.len() == 0 {
 
+                    let mut bs = built_shadertoys.lock().unwrap();
+                    bs.push(BuiltShadertoy {
+                        info: shader.info.clone(),
+                        shader_source: full_source,
+                        pipeline: None,
+                        pipeline_failed: false
+                    });
+                }
+                            
                 // download texture inputs
 
                 for input in pass.inputs.iter() {
@@ -268,16 +267,11 @@ fn query(matches: &clap::ArgMatches) -> Result<Vec<String>> {
                 }
             }
 
-            if success {
-                built_count.fetch_add(1, Ordering::SeqCst);
-            }
-
             Ok(())
         };
 
         
         let threads: i64 = matches.value_of("threads").unwrap().parse().unwrap();
-
 
         if threads == 0 {
             for shadertoy in shadertoys.iter() {
@@ -296,11 +290,9 @@ fn query(matches: &clap::ArgMatches) -> Result<Vec<String>> {
                 let _r_ = process_shadertoy(shadertoy);
             });
         }
-
-        println!("{} / {} shadertoys fully built", built_count.load(Ordering::SeqCst), shadertoys_len);
     }
 
-    Ok(built_shaders.into_inner().unwrap())
+    Ok(built_shadertoys.into_inner().unwrap())
 }
 
 fn run() -> Result<()> {
@@ -362,7 +354,18 @@ fn run() -> Result<()> {
         .get_matches();
 
 
-    let built_shadertoy_shaders = query(&matches).chain_err(|| "query for shaders failed")?;
+    // setup renderer
+
+    let render_backend: Option<Box<RenderBackend>>;
+
+    if cfg!(target_os = "macos") {
+        render_backend = Some(Box::new(MetalRenderBackend::new()));
+    } else {
+        render_backend = None;
+    }
+
+
+    let mut built_shadertoy_shaders = download(&matches).chain_err(|| "query for shaders failed")?;
 
     if built_shadertoy_shaders.len() == 0 {
         return Ok(());
@@ -377,15 +380,7 @@ fn run() -> Result<()> {
             .build(&events_loop)
             .chain_err(|| "error creating window")?;
 
-        let render_backend: Option<Box<RenderBackend>>;
-
-        if cfg!(target_os = "macos") {
-            render_backend = Some(Box::new(MetalRenderBackend::new()));
-        } else {
-            render_backend = None;
-        }
-
-        let mut render_backend = render_backend.chain_err(|| "no renderer available")?;
+        let mut render_backend = render_backend.chain_err(|| "skipping rendering, as have no renderer available")?;
         render_backend.init_window(&window);
 
 
@@ -433,21 +428,45 @@ fn run() -> Result<()> {
             // update window title
 
             if shadertoy_index != prev_shadertoy_index {
-                window.set_title(&format!("Shadertoy Browser: {} / {}", shadertoy_index+1, built_shadertoy_shaders.len()));
+
+                if let Some(ref shadertoy) = built_shadertoy_shaders.get(shadertoy_index) {
+                    window.set_title(&format!("Shadertoy ({} / {}) - {} by {}", 
+                        shadertoy_index+1, 
+                        built_shadertoy_shaders.len(), 
+                        shadertoy.info.name, 
+                        shadertoy.info.username));
+                } else {
+                    window.set_title("Shadertoy Browser");
+                }
                 prev_shadertoy_index = shadertoy_index;
             }
 
             // render frame
 
+            let pipeline = {
+
+                if let Some(ref mut shadertoy) = built_shadertoy_shaders.get_mut(shadertoy_index) {
+
+                    if shadertoy.pipeline == None && !shadertoy.pipeline_failed {                        
+
+                        match render_backend.new_pipeline(shadertoy.shader_source.as_str()) {
+                            Ok(pipeline) => shadertoy.pipeline = Some(pipeline),
+                            Err(err) => {
+                                println!("Shader pipeline build failed: {}", err);
+                                shadertoy.pipeline_failed = true;
+                            },
+                        }
+                    }
+                    shadertoy.pipeline
+                } else {
+                    None
+                }
+            };
+    
+
             render_backend.present(RenderParams {
                 mouse_cursor_pos: cursor_pos,
-                shader_source: {
-                    if let Some(shader_source) = built_shadertoy_shaders.get(shadertoy_index) {
-                        shader_source.clone()
-                    } else {
-                        String::new() // empty string
-                    }
-                },
+                pipeline: pipeline
             });
 
             #[cfg(target_os = "macos")]

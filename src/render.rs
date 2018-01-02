@@ -1,5 +1,7 @@
 use std::any::Any;
 
+use errors::*;
+
 #[allow(non_snake_case)]
 pub struct ShadertoyConstants {
     // The viewport resolution (z is pixel aspect ratio, usually 1.0).
@@ -28,12 +30,17 @@ pub struct ShadertoyConstants {
     pub pad3: [f32; 3],
 }
 
+pub type RenderPipelineHandle = usize;
+
 pub struct RenderParams {
     pub mouse_cursor_pos: (f64, f64),
-    pub shader_source: String,
+    pub pipeline: Option<RenderPipelineHandle>,
 }
 
 pub trait RenderBackend {
+
     fn init_window(&mut self, window: &Any);
     fn present(&mut self, params: RenderParams);
+
+    fn new_pipeline(&mut self, shader_source: &str) -> Result<RenderPipelineHandle>;
 }
