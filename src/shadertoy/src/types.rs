@@ -1,7 +1,7 @@
 // These are the json types that the Shadertoy API outputs
 // This is manually derived
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct Shader {
     pub ver: String,
@@ -9,7 +9,7 @@ pub struct Shader {
     pub renderpass: Vec<RenderPass>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct ShaderInfo {
     pub id: String,
@@ -25,7 +25,7 @@ pub struct ShaderInfo {
     pub hasliked: u64,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct RenderPass {
     pub inputs: Vec<RenderPassInput>,
@@ -38,7 +38,7 @@ pub struct RenderPass {
     pub pass_type: String,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct RenderPassInput {
     pub id: u64,
@@ -49,14 +49,14 @@ pub struct RenderPassInput {
     pub published: u64,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct RenderPassOutput {
     pub id: u64,
     pub channel: u64,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct Sampler {
     pub filter: String,
