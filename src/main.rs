@@ -154,7 +154,7 @@ fn download(matches: &clap::ArgMatches) -> Result<Vec<BuiltShadertoy>> {
 
         let process_shadertoy = |shadertoy| -> Result<()> {
 
-            let path = PathBuf::from(format!("output/shader/{}.json", shadertoy));
+            let path = PathBuf::from(format!("output/shader/{}/{}.json", shadertoy, shadertoy));
 
             let shader;
 
@@ -170,7 +170,7 @@ fn download(matches: &clap::ArgMatches) -> Result<Vec<BuiltShadertoy>> {
             println!("({} / {}) {} - {} by {}, {} views, {} likes", 
                 index.fetch_add(1, Ordering::SeqCst), 
                 shadertoys_len, 
-                shadertoy,
+                shadertoy.yellow(),
                 shader.info.name.green(), 
                 shader.info.username.blue(),
                 shader.info.viewed,
@@ -219,7 +219,7 @@ fn download(matches: &clap::ArgMatches) -> Result<Vec<BuiltShadertoy>> {
                 let full_source = format!("{}\n{}\n{}\n{}", header_source, sampler_source, pass.code, footer_source);
 
                 // save out the source GLSL file, for debugging
-                let glsl_path = PathBuf::from(format!("output/shader/{} {}.glsl", shadertoy, pass.name));
+                let glsl_path = PathBuf::from(format!("output/shader/{}/{}{}.glsl", shadertoy, shadertoy, pass.name));
                 write_file(&glsl_path, full_source.as_bytes())?;
 
                 if pass.pass_type == "image" && pass.inputs.len() == 0 {
@@ -302,7 +302,11 @@ fn build(render_backend: &mut RenderBackend, shadertoy: &mut BuiltShadertoy) {
         match render_backend.new_pipeline(shadertoy.shader_source.as_str()) {
             Ok(pipeline_handle) => shadertoy.pipeline_handle = Some(pipeline_handle),
             Err(err) => {
-                println!("Shader pipeline build failed: {}", err);
+                println!("Failed building shader for shadertoy {} ({} by {}): {}", 
+                    shadertoy.info.id.yellow(),
+                    shadertoy.info.name.green(), 
+                    shadertoy.info.username.blue(),
+                    err);
                 shadertoy.pipeline_failed = true;
             },
         }
