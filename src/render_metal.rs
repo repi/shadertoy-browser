@@ -1,12 +1,12 @@
-extern crate libc;
 extern crate foreign_types;
+extern crate libc;
 extern crate metal_rs as metal;
-extern crate winit;
 extern crate shaderc;
 extern crate spirv_cross;
+extern crate winit;
 
-extern crate objc_foundation;
 extern crate cocoa;
+extern crate objc_foundation;
 
 use std::time::Instant;
 use std::mem;
@@ -18,7 +18,7 @@ use self::foreign_types::ForeignType;
 
 use cocoa::base::id as cocoa_id;
 use cocoa::foundation::NSSize;
-use cocoa::appkit::{NSWindow, NSView};
+use cocoa::appkit::{NSView, NSWindow};
 use winit::os::macos::WindowExt;
 
 use floating_duration::TimeAsFloat;
@@ -31,8 +31,7 @@ struct MetalRenderPipeline {
     pipeline_state: metal::RenderPipelineState,
 }
 
-impl MetalRenderPipeline {
-}
+impl MetalRenderPipeline {}
 
 pub struct MetalRenderBackend {
     device: metal::Device,
@@ -45,7 +44,7 @@ pub struct MetalRenderBackend {
     time: Instant,
     time_last_frame: Instant,
 
-    pipelines: Vec<MetalRenderPipeline>
+    pipelines: Vec<MetalRenderPipeline>,
 }
 
 impl MetalRenderBackend {
@@ -97,7 +96,6 @@ impl MetalRenderBackend {
 
 impl RenderBackend for MetalRenderBackend {
     fn init_window(&mut self, window: &Any) {
-
         let winit_window = window.downcast_ref::<winit::Window>().unwrap();
 
         let cocoa_window: cocoa_id = unsafe { mem::transmute(winit_window.get_nswindow()) };
@@ -123,12 +121,10 @@ impl RenderBackend for MetalRenderBackend {
     }
 
     fn render_frame(&mut self, params: RenderParams) {
-
         //println!("frame: {}", self.frame_index);
 
         if let Some(ref layer) = self.layer {
             if let Some(drawable) = layer.next_drawable() {
-
                 let render_pass_descriptor = metal::RenderPassDescriptor::new();
                 let color_attachment = render_pass_descriptor
                     .color_attachments()
@@ -140,7 +136,8 @@ impl RenderBackend for MetalRenderBackend {
                     params.clear_color.0 as f64,
                     params.clear_color.1 as f64,
                     params.clear_color.2 as f64,
-                    params.clear_color.3 as f64));
+                    params.clear_color.3 as f64,
+                ));
                 color_attachment.set_store_action(metal::MTLStoreAction::Store);
 
                 let command_buffer = self.command_queue.new_command_buffer();
@@ -151,7 +148,6 @@ impl RenderBackend for MetalRenderBackend {
                 let h = drawable.texture().height() as f32;
 
                 for quad in params.quads {
-
                     let constants = {
                         let time = self.time.elapsed().as_fractional_secs() as f32;
                         let delta_time = self.time_last_frame.elapsed().as_fractional_secs() as f32;
@@ -159,9 +155,9 @@ impl RenderBackend for MetalRenderBackend {
                         let dt: DateTime<Local> = Local::now();
 
                         let mut mouse = (
-                            (params.mouse_pos.0 as f32) / self.dpi_factor, 
-                            (params.mouse_pos.1 as f32) / self.dpi_factor, 
-                            (params.mouse_click_pos.0 as f32) / self.dpi_factor, 
+                            (params.mouse_pos.0 as f32) / self.dpi_factor,
+                            (params.mouse_pos.1 as f32) / self.dpi_factor,
+                            (params.mouse_click_pos.0 as f32) / self.dpi_factor,
                             (params.mouse_click_pos.1 as f32) / self.dpi_factor,
                         );
 
@@ -174,11 +170,7 @@ impl RenderBackend for MetalRenderBackend {
                         }
 
                         ShadertoyConstants {
-                            iResolution: (
-                                (quad.size.0 * w), 
-                                (quad.size.1 * h), 
-                                w / h
-                            ),
+                            iResolution: ((quad.size.0 * w), (quad.size.1 * h), w / h),
                             pad1: 0.0,
                             iMouse: mouse,
                             iTime: time,
@@ -213,7 +205,7 @@ impl RenderBackend for MetalRenderBackend {
                     encoder.set_cull_mode(metal::MTLCullMode::None);
                     encoder.set_vertex_bytes(0, mem::size_of::<ShadertoyConstants>() as u64, constants_cptr);
                     encoder.set_fragment_bytes(0, mem::size_of::<ShadertoyConstants>() as u64, constants_cptr);
-                    
+
                     encoder.set_viewport(metal::MTLViewport {
                         originX: (quad.pos.0 * w) as f64,
                         originY: (quad.pos.1 * h) as f64,
@@ -239,7 +231,6 @@ impl RenderBackend for MetalRenderBackend {
     }
 
     fn new_pipeline(&mut self, shader_source: &str) -> Result<RenderPipelineHandle> {
-
         let metal_source = convert_glsl_to_metal("unknown name", "main", shader_source)?;
 
         // save out the generated Metal file, for debugging
@@ -252,7 +243,7 @@ impl RenderBackend for MetalRenderBackend {
 
         self.pipelines.push(pipeline);
 
-        Ok(self.pipelines.len()-1 as RenderPipelineHandle)
+        Ok(self.pipelines.len() - 1 as RenderPipelineHandle)
     }
 }
 
@@ -321,8 +312,7 @@ fn new_render_pipeline_state(
     descriptor: &metal::RenderPipelineDescriptorRef,
 ) -> Result<metal::RenderPipelineState> {
     unsafe {
-        let pipeline_state: *mut metal::MTLRenderPipelineState =
-            try_objc!{ err =>
+        let pipeline_state: *mut metal::MTLRenderPipelineState = try_objc!{ err =>
             msg_send![*device, newRenderPipelineStateWithDescriptor:descriptor
                                                             error:&mut err]
         };
@@ -338,32 +328,36 @@ fn new_render_pipeline_state(
 }
 
 fn convert_glsl_to_metal(name: &str, entry_point: &str, source: &str) -> Result<String> {
-
     // convert to SPIR-V using shaderc
 
     let mut compiler = shaderc::Compiler::new().unwrap();
     let options = shaderc::CompileOptions::new().unwrap();
 
-    let binary_result = compiler.compile_into_spirv(source, shaderc::ShaderKind::Fragment, name, entry_point, Some(&options))
+    let binary_result = compiler
+        .compile_into_spirv(
+            source,
+            shaderc::ShaderKind::Fragment,
+            name,
+            entry_point,
+            Some(&options),
+        )
         .chain_err(|| "shaderc compilation to SPIRV failed")?;
 
     // convert SPIR-V to MSL
 
-    use self::spirv_cross::{spirv, msl};
+    use self::spirv_cross::{msl, spirv};
 
     let module = spirv::Module::from_words(binary_result.as_binary());
 
     let mut ast = spirv::Ast::<msl::Target>::parse(&module).unwrap();
 
-//    ast.compile().chain_err(|| "spirv-cross compilation failed")?
+    //    ast.compile().chain_err(|| "spirv-cross compilation failed")?
 
     match ast.compile() {
         Ok(str) => Ok(str),
-        Err(e) => {
-            match e {
-                spirv_cross::ErrorCode::Unhandled => Err("spirv-cross handled error".into()),
-                spirv_cross::ErrorCode::CompilationError(str) => Err(format!("spirv-cross error: {}", str).into()),
-            }
-        }
+        Err(e) => match e {
+            spirv_cross::ErrorCode::Unhandled => Err("spirv-cross handled error".into()),
+            spirv_cross::ErrorCode::CompilationError(str) => Err(format!("spirv-cross error: {}", str).into()),
+        },
     }
 }
