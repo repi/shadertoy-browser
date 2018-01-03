@@ -39,6 +39,8 @@ pub struct MetalRenderBackend {
     command_queue: metal::CommandQueue,
 
     layer: Option<metal::CoreAnimationLayer>,
+    dpi_factor: f32,
+
     frame_index: u64,
     time: Instant,
     time_last_frame: Instant,
@@ -56,6 +58,7 @@ impl MetalRenderBackend {
             device,
             command_queue,
             layer: None,
+            dpi_factor: 1.0,
             frame_index: 0,
             time: Instant::now(),
             time_last_frame: Instant::now(),
@@ -115,6 +118,8 @@ impl RenderBackend for MetalRenderBackend {
         layer.set_drawable_size(NSSize::new(draw_size.0 as f64, draw_size.1 as f64));
 
         self.layer = Some(layer);
+
+        self.dpi_factor = winit_window.hidpi_factor();
     }
 
     fn render_frame(&mut self, params: RenderParams) {
@@ -149,15 +154,25 @@ impl RenderBackend for MetalRenderBackend {
 
                         let dt: DateTime<Local> = Local::now();
 
+                        let mut iMouse = (
+                            (params.mouse_pos.0 as f32) / self.dpi_factor, 
+                            (params.mouse_pos.1 as f32) / self.dpi_factor, 
+                            (params.mouse_click_pos.0 as f32) / self.dpi_factor, 
+                            (params.mouse_click_pos.1 as f32) / self.dpi_factor,
+                        );
+
+                        // flip y
+                        if iMouse.1 > 0.0 {
+                            iMouse.1 = h - iMouse.1;
+                        }
+                        if iMouse.3 > 0.0 {
+                            iMouse.3 = h - iMouse.3;
+                        }
+
                         ShadertoyConstants {
                             iResolution: (w, h, w / h),
                             pad1: 0.0,
-                            iMouse: (
-                                params.mouse_pos.0 as f32, 
-                                params.mouse_pos.1 as f32, 
-                                params.mouse_click_pos.0 as f32, 
-                                params.mouse_click_pos.1 as f32,
-                            ),
+                            iMouse,
                             iTime: time,
                             iTimeDelta: delta_time,
                             iFrameRate: 1.0 / delta_time,

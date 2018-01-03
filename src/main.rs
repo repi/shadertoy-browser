@@ -390,6 +390,7 @@ fn run() -> Result<()> {
         let mut running = true;
 
         let mut mouse_pos = (0.0f64, 0.0f64);
+        let mut mouse_pressed_pos = (0.0f64, 0.0f64);
         let mut mouse_click_pos = (0.0f64, 0.0f64);
         let mut mouse_lmb_pressed = false;
         
@@ -404,8 +405,9 @@ fn run() -> Result<()> {
             events_loop.poll_events(|event| match event {
                 winit::Event::WindowEvent { event: winit::WindowEvent::Closed, .. } => running = false,
                 winit::Event::WindowEvent { event: winit::WindowEvent::CursorMoved { position, .. }, .. } => {
+                    mouse_pos = position;
                     if mouse_lmb_pressed {
-                        mouse_pos = position;
+                        mouse_pressed_pos = position;
                     }
                 }
                 winit::Event::WindowEvent { event: winit::WindowEvent::MouseInput { state, button, .. }, .. } => {
@@ -418,7 +420,7 @@ fn run() -> Result<()> {
                         }
                     }
                     else {
-                        mouse_pos = (0.0, 0.0);
+                        mouse_pressed_pos = (0.0, 0.0);
                         mouse_click_pos = (0.0, 0.0);
                         mouse_lmb_pressed = false;
                     }
@@ -511,7 +513,7 @@ fn run() -> Result<()> {
             }
 
             render_backend.render_frame(RenderParams {
-                mouse_pos,
+                mouse_pos: mouse_pressed_pos,
                 mouse_click_pos,
                 quads: &quads
             });
