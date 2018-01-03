@@ -83,6 +83,25 @@ impl Client {
     }
 
     /// Issues a search query for shadertoys.
+    /// If the query is successful a list of shader ids will be returned,
+    /// which can be used with `get_shader`.
+    /// 
+    /// # Examples
+    /// 
+    /// ```
+    /// # fn main() {
+    /// let client = shadertoy::Client::new("Bd8tWD"); // insert your own API key here
+    /// let search_params = shadertoy::SearchParams {
+    /// 	string: "car",
+    ///     sort_order: shadertoy::SearchSortOrder::Love,
+    ///     filters: vec![],
+    /// };
+    /// match client.search(search_params) {
+    /// 	Ok(shader_ids) => println!("\"Car\" shadertoys: {:?}", shader_ids),
+    /// 	Err(err) => println!("Search failed: {}", err),
+    /// }
+    /// # }
+    /// ```
     pub fn search(&self, params: SearchParams) -> Result<Vec<String>> {
 
         let query_str = format!("https://www.shadertoy.com/api/v1/shaders{}?sort={}&{}key={}", 
@@ -128,6 +147,7 @@ impl Client {
         }
     }
 
+    /// Retrives a shader given an id.
     pub fn get_shader(&self, shader_id: &str) -> Result<Shader> {
 
         let json_str = self.rest_client

@@ -9,9 +9,32 @@ Rust library wrapping the [Shadertoy REST API](http://shadertoy.com/api) to be a
 
 ## Usage
 
+In `Cargo.toml`:
+
 ```toml
 [dependencies]
-shadertoy = "0.3"
+shadertoy = "0.4"
+```
+
+Example usage:
+
+```rust
+extern crate shadertoy;
+
+fn test() {
+    let client = shadertoy::Client::new("Bd8tWD"); // insert your own API key here
+    
+	let search_params = shadertoy::SearchParams {
+        string: "car",
+        sort_order: shadertoy::SearchSortOrder::Love,
+        filters: vec![],
+    };
+
+    match client.search(search_params) {
+        Ok(shader_ids) => println!("\"Car\" shadertoys: {:?}", shader_ids),
+        Err(err) => println!("Search failed: {}", err),
+    }
+}
 ```
 
 TODO
