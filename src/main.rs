@@ -167,7 +167,7 @@ fn download(matches: &clap::ArgMatches) -> Result<Vec<BuiltShadertoy>> {
                 shader = serde_json::from_str(&json_str)?;
             }
 
-            println!("({} / {}) {} - {} by {}, {} views, {} likes", 
+            println!("({} / {}) {} - {} by {} - {} views, {} likes", 
                 index.fetch_add(1, Ordering::SeqCst), 
                 shadertoys_len, 
                 shadertoy.yellow(),
@@ -298,6 +298,21 @@ fn download(matches: &clap::ArgMatches) -> Result<Vec<BuiltShadertoy>> {
 
 fn build(render_backend: &mut RenderBackend, shadertoy: &mut BuiltShadertoy) {
     if shadertoy.pipeline_handle == None && !shadertoy.pipeline_failed {                        
+
+        println!("Building shader for shadertoyshadertoy {} ({} by {})", 
+            shadertoy.info.id.yellow(),
+            shadertoy.info.name.green(), 
+            shadertoy.info.username.blue());
+
+        // these shaders get stuck in forever compilation, so let's skip them forn ow
+        // TODO should make compilation more robust and be able to timeout and then remove this
+        let skip_shaders = [ "XdsBzj", "XtlSD7", "MlB3Wt" ];
+        
+        if skip_shaders.contains(&shadertoy.info.id.as_str()) {
+            shadertoy.pipeline_failed = true;
+            println!("Skipping");
+            return;
+        }
 
         match render_backend.new_pipeline(shadertoy.shader_source.as_str()) {
             Ok(pipeline_handle) => shadertoy.pipeline_handle = Some(pipeline_handle),
@@ -465,6 +480,12 @@ fn run() -> Result<()> {
                                     let _r_ = open::that(format!("https://www.shadertoy.com/view/{}", shadertoy.info.id));
                                 }
                             }
+                            // this panics on Mac as "not yet implemented"
+                        /*
+                            Some(winit::VirtualKeyCode::F) => {
+                                window.set_fullscreen(None);
+                            }
+                        */
                             // manual workaround for CMD-Q on Mac not quitting the app
                             // issue tracked in https://github.com/tomaka/winit/issues/41
                             Some(winit::VirtualKeyCode::Q) => {
@@ -492,29 +513,29 @@ fn run() -> Result<()> {
             if draw_grid {
 
                 let start_index = shadertoy_index / shadertoy_increment * shadertoy_increment;
-
+                
                 for index in 0..shadertoy_increment {
 
                     if let Some(ref mut shadertoy) = built_shadertoy_shaders.get_mut(start_index + index) {
 
-                    build(&mut *render_backend, shadertoy);
+                        build(&mut *render_backend, shadertoy);
 
-                    if let Some(pipeline_handle) = shadertoy.pipeline_handle {
-                        let grid_pos = (index % grid_size.0, index / grid_size.0 );
+                        if let Some(pipeline_handle) = shadertoy.pipeline_handle {
+                            let grid_pos = (index % grid_size.0, index / grid_size.0 );
 
-                        quads.push(RenderQuad {
-                            pos: (
-                                (grid_pos.0 as f32) / (grid_size.0 as f32), 
-                                (grid_pos.1 as f32) / (grid_size.1 as f32)
-                            ),
-                            size: (
-                                1.0 / (grid_size.0 as f32), 
-                                1.0 / (grid_size.1 as f32)
-                            ),
-                            pipeline_handle,
-                        });
+                            quads.push(RenderQuad {
+                                pos: (
+                                    (grid_pos.0 as f32) / (grid_size.0 as f32), 
+                                    (grid_pos.1 as f32) / (grid_size.1 as f32)
+                                ),
+                                size: (
+                                    1.0 / (grid_size.0 as f32), 
+                                    1.0 / (grid_size.1 as f32)
+                                ),
+                                pipeline_handle,
+                            });
+                        }
                     }
-                }
                 }
             } else {
     
@@ -551,13 +572,7 @@ fn run() -> Result<()> {
             }            
 
             render_backend.render_frame(RenderParams {
-                clear_color: {
-                    if draw_grid {
-                        (0.0, 0.0, 0.0, 0.0)
-                    } else {
-                        (1.0, 0.0, 0.0, 1.0)
-                    }
-                },
+                clear_color: (1.0, 0.0, 0.0, 1.0),
                 mouse_pos: mouse_pressed_pos,
                 mouse_click_pos,
                 quads: &quads
