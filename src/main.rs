@@ -328,7 +328,7 @@ fn run() -> Result<()> {
     let matches = App::new("Shadertoy Browser")
         .version(crate_version!())
         .author("Johan Andersson <repi@repi.se>")
-        .about("Downloads shadertoys as json files") // TODO update about
+        .about("Downloads and views shadertoys")
         .arg(
             Arg::with_name("apikey")
                 .short("k")

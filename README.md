@@ -10,13 +10,27 @@ The API queries are done through the [`shadertoy`](https://crates.io/crates/shad
 
 ![Render](ScreenshotRender.jpg) ![Output](ScreenshotOutput.jpg)
 
+## Building
+
+First make sure you have [Rust installed](https://www.rust-lang.org/en-US/install.html) installed.
+Then building & running is easy:
+
+```sh
+$ git clone https://github.com/repi/shadertoy-browser
+$ cd shadertoy-browser
+$ cargo build --release
+
+# this will download and view all shadertoys with "car" in the name
+$ cargo run --release -- -s car 
+```
+
 ## Usage
 
 Keys:
 
-- `LEFT` and `RIGHT`: switch between shadertoys.
-- `SPACE`: toggle grid view mode
-- `ENTER`: open shadertoy.com for current shader
+- `LEFT` and `RIGHT` - switch between shadertoys.
+- `SPACE` - toggle grid view mode
+- `ENTER` - open shadertoy.com for current shader
 
 If the screen is red that indicates the shader wasn't able to be built.
 
@@ -27,13 +41,15 @@ USAGE:
     shadertoy-browser [FLAGS] [OPTIONS]
 
 FLAGS:
+    -b, --buildall    Build all shaders upfront. This is useful to stress test compilation, esp. together with
+                      --headless
         --help        Prints help information
     -h, --headless    Don't render, only download shadertoys
     -V, --version     Prints version information
 
 OPTIONS:
     -k, --apikey <key>          Set shadertoy API key to use. Create your key on https://www.shadertoy.com/myapps
-                                [default: BtHtW3]
+                                [default: BtHtWD]
     -f, --filter <filter>...    Inclusion filters [values: VR, SoundOutput, SoundInput, Webcam, MultiPass, MusicStream]
     -o, --order <order>         Sort order [default: Popular]  [values: Name, Love, Popular, Newest, Hot]
     -s, --search <string>       Search string to filter which shadertoys to get
@@ -42,18 +58,6 @@ OPTIONS:
 ```
 
 To use the Rust shadertoy API directly in another app or library, check out the [`shadertoy`](https://crates.io/crates/shadertoy) crate, [docs](http://docs.rs/shadertoy) and [README](src/shadertoy/README.MD).
-
-## Building
-
-First make sure you have [Rust installed](https://www.rust-lang.org/en-US/install.html) installed.
-Then building is easy:
-
-```sh
-$ git clone https://github.com/repi/shadertoy-browser
-$ cd shadertoy-browser
-$ cargo build --release
-$ ./target/release/shadertoy-browser
-```
 
 ## License
 
