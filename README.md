@@ -8,6 +8,8 @@ This application uses the [Shadertoy REST API](http://shadertoy.com/api) to sear
 
 The API queries are done through the [`shadertoy`](https://crates.io/crates/shadertoy) crate, which is also part of this repository in [`src/shadertoy`](src/shadertoy)
 
+![Render](ScreenshotRender.jpg) ![Output](ScreenshotOutput.jpg)
+
 ## Usage
 
 Use `LEFT` and `RIGHT` arrow keys to switch between shadertoys. 
