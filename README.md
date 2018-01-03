@@ -12,7 +12,11 @@ The API queries are done through the [`shadertoy`](https://crates.io/crates/shad
 
 ## Usage
 
-Use `LEFT` and `RIGHT` arrow keys to switch between shadertoys.
+Keys:
+
+- `LEFT` and `RIGHT`: switch between shadertoys.
+- `SPACE`: toggle grid view mode
+- `ENTER`: open shadertoy.com for current shader
 
 If the screen is red that indicates the shader wasn't able to be built.
 

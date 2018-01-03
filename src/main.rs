@@ -16,6 +16,7 @@ extern crate floating_duration;
 extern crate chrono;
 extern crate rayon;
 extern crate winit;
+extern crate open;
 extern crate rust_base58 as base58;
 extern crate serde_json;
 extern crate colored;
@@ -454,6 +455,11 @@ fn run() -> Result<()> {
                             }
                             Some(winit::VirtualKeyCode::Space) => {
                                 draw_grid = !draw_grid;
+                            }
+                            Some(winit::VirtualKeyCode::Return) => {
+                                if let Some(ref shadertoy) = built_shadertoy_shaders.get_mut(shadertoy_index) {
+                                    let _r_ = open::that(format!("https://www.shadertoy.com/view/{}", shadertoy.info.id));
+                                }
                             }
                             // manual workaround for CMD-Q on Mac not quitting the app
                             // issue tracked in https://github.com/tomaka/winit/issues/41
