@@ -295,6 +295,19 @@ fn download(matches: &clap::ArgMatches) -> Result<Vec<BuiltShadertoy>> {
     Ok(built_shadertoys.into_inner().unwrap())
 }
 
+fn build(render_backend: &mut RenderBackend, shadertoy: &mut BuiltShadertoy) {
+    if shadertoy.pipeline_handle == None && !shadertoy.pipeline_failed {                        
+
+        match render_backend.new_pipeline(shadertoy.shader_source.as_str()) {
+            Ok(pipeline_handle) => shadertoy.pipeline_handle = Some(pipeline_handle),
+            Err(err) => {
+                println!("Shader pipeline build failed: {}", err);
+                shadertoy.pipeline_failed = true;
+            },
+        }
+    }    
+}
+
 fn run() -> Result<()> {
 
     let matches = App::new("Shadertoy Browser")
@@ -396,11 +409,16 @@ fn run() -> Result<()> {
         
 
         let mut shadertoy_index = 0usize;
-        let mut prev_shadertoy_index = 1usize;
-        let mut draw_grid = false;
+        let mut draw_grid = true;
+        let grid_size = (4, 4);
         
-
         while running {
+
+            let shadertoy_increment = if draw_grid {
+                grid_size.0 * grid_size.1
+            } else {
+                1
+            };
 
             events_loop.poll_events(|event| match event {
                 winit::Event::WindowEvent { event: winit::WindowEvent::Closed, .. } => running = false,
@@ -429,14 +447,10 @@ fn run() -> Result<()> {
                     if input.state == winit::ElementState::Pressed {
                         match input.virtual_keycode {
                             Some(winit::VirtualKeyCode::Left) => {
-                                if shadertoy_index != 0 {
-                                    shadertoy_index -= 1;
-                                }
+                                shadertoy_index = shadertoy_index.saturating_sub(shadertoy_increment);
                             }
                             Some(winit::VirtualKeyCode::Right) => {
-                                if shadertoy_index + 1 < built_shadertoy_shaders.len() {
-                                    shadertoy_index += 1;
-                                }
+                                shadertoy_index += shadertoy_increment;
                             }
                             Some(winit::VirtualKeyCode::Space) => {
                                 draw_grid = !draw_grid;
@@ -458,21 +472,8 @@ fn run() -> Result<()> {
                 _ => (),
             });
 
-            // update window title
-
-            if shadertoy_index != prev_shadertoy_index {
-
-                if let Some(ref shadertoy) = built_shadertoy_shaders.get(shadertoy_index) {
-                    window.set_title(&format!("Shadertoy ({} / {}) - {} by {}", 
-                        shadertoy_index+1, 
-                        built_shadertoy_shaders.len(), 
-                        shadertoy.info.name, 
-                        shadertoy.info.username));
-                } else {
-                    window.set_title("Shadertoy Browser");
-                }
-                prev_shadertoy_index = shadertoy_index;
-            }
+            shadertoy_index = shadertoy_index.min(built_shadertoy_shaders.len());
+            
 
             // render frame
 
@@ -480,16 +481,25 @@ fn run() -> Result<()> {
 
             if draw_grid {
 
-                let grid_size = (4, 4);
+                let start_index = shadertoy_index / shadertoy_increment * shadertoy_increment;
 
-                for shadertoy in &built_shadertoy_shaders {
+                for shadertoy in &mut built_shadertoy_shaders[start_index .. ] {
+
+                    build(&mut *render_backend, shadertoy);
+
                     if let Some(pipeline_handle) = shadertoy.pipeline_handle {
                         let index = quads.len();
                         let grid_pos = (index % grid_size.0, index / grid_size.0 );
 
                         quads.push(RenderQuad {
-                            pos: ((grid_pos.0 as f32) / (grid_size.0 as f32), (grid_pos.1 as f32) / (grid_size.1 as f32)),
-                            size: (1.0 / (grid_size.0 as f32), 1.0 / (grid_size.1 as f32)),
+                            pos: (
+                                (grid_pos.0 as f32) / (grid_size.0 as f32), 
+                                (grid_pos.1 as f32) / (grid_size.1 as f32)
+                            ),
+                            size: (
+                                1.0 / (grid_size.0 as f32), 
+                                1.0 / (grid_size.1 as f32)
+                            ),
                             pipeline_handle,
                         });
                     }
@@ -498,16 +508,7 @@ fn run() -> Result<()> {
     
                 if let Some(ref mut shadertoy) = built_shadertoy_shaders.get_mut(shadertoy_index) {
 
-                    if shadertoy.pipeline_handle == None && !shadertoy.pipeline_failed {                        
-
-                        match render_backend.new_pipeline(shadertoy.shader_source.as_str()) {
-                            Ok(pipeline_handle) => shadertoy.pipeline_handle = Some(pipeline_handle),
-                            Err(err) => {
-                                println!("Shader pipeline build failed: {}", err);
-                                shadertoy.pipeline_failed = true;
-                            },
-                        }
-                    }
+                    build(&mut *render_backend, shadertoy);
 
                     if let Some(pipeline_handle) = shadertoy.pipeline_handle {
                         quads.push(RenderQuad {
@@ -518,6 +519,20 @@ fn run() -> Result<()> {
                     }
                 }
             }
+
+            // update window title
+
+            let active_shadertoy = built_shadertoy_shaders.get(shadertoy_index);
+
+            if !draw_grid && active_shadertoy.is_some() {
+                window.set_title(&format!("Shadertoy ({} / {}) - {} by {}", 
+                    shadertoy_index+1, 
+                    built_shadertoy_shaders.len(), 
+                    active_shadertoy.unwrap().info.name, 
+                    active_shadertoy.unwrap().info.username));
+            } else {
+                window.set_title("Shadertoy Browser");
+            }            
 
             render_backend.render_frame(RenderParams {
                 mouse_pos: mouse_pressed_pos,
