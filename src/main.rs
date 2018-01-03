@@ -441,6 +441,13 @@ fn run() -> Result<()> {
                             Some(winit::VirtualKeyCode::Space) => {
                                 draw_grid = !draw_grid;
                             }
+                            // manual workaround for CMD-Q on Mac not quitting the app
+                            // issue tracked in https://github.com/tomaka/winit/issues/41
+                            Some(winit::VirtualKeyCode::Q) => {
+                                if cfg!(target_os = "macos") && input.modifiers.logo {
+                                    running = false;
+                                }
+                            }
                             _ => (),
                         }
                     }
