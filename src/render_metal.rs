@@ -117,49 +117,12 @@ impl RenderBackend for MetalRenderBackend {
         self.layer = Some(layer);
     }
 
-    fn present(&mut self, params: RenderParams) {
+    fn render_frame(&mut self, params: RenderParams) {
 
         //println!("frame: {}", self.frame_index);
 
         if let Some(ref layer) = self.layer {
             if let Some(drawable) = layer.next_drawable() {
-
-                let constants = {
-                    let w = drawable.texture().width() as f32;
-                    let h = drawable.texture().height() as f32;
-
-                    let time = self.time.elapsed().as_fractional_secs() as f32;
-                    let delta_time = self.time_last_frame.elapsed().as_fractional_secs() as f32;
-
-                    let dt: DateTime<Local> = Local::now();
-
-                    ShadertoyConstants {
-                        iResolution: (w, h, w / h),
-                        pad1: 0.0,
-                        iMouse: (params.mouse_cursor_pos.0 as f32, params.mouse_cursor_pos.1 as f32, 0.0, 0.0),
-                        iTime: time,
-                        iTimeDelta: delta_time,
-                        iFrameRate: 1.0 / delta_time,
-                        iSampleRate: 44100.0,
-                        iFrame: self.frame_index as i32,
-                        pad2: [0, 0, 0],
-                        iDate: (
-                            dt.year() as f32,
-                            dt.month() as f32,
-                            dt.day() as f32,
-                            dt.second() as f32, // TODO unclear what seconds should be here?
-                        ),
-                        iChannelTime: [time, time, time, time], // TODO not correct
-                        iChannelResolution: [
-                            (0.0, 0.0, 0.0, 0.0),
-                            (0.0, 0.0, 0.0, 0.0),
-                            (0.0, 0.0, 0.0, 0.0),
-                            (0.0, 0.0, 0.0, 0.0),
-                        ],
-                        iBlockOffset: 0.0,
-                        pad3: [0.0, 0.0, 0.0],
-                    }
-                };
 
                 let render_pass_descriptor = metal::RenderPassDescriptor::new();
                 let color_attachment = render_pass_descriptor
@@ -175,16 +138,68 @@ impl RenderBackend for MetalRenderBackend {
                 let parallel_encoder = command_buffer.new_parallel_render_command_encoder(&render_pass_descriptor);
                 let encoder = parallel_encoder.render_command_encoder();
 
-                if let Some(pipeline_handle) = params.pipeline {
-                    let pipeline = &self.pipelines[pipeline_handle];
+                let w = drawable.texture().width() as f32;
+                let h = drawable.texture().height() as f32;
+
+                for quad in params.quads {
+
+                    let constants = {
+                        let time = self.time.elapsed().as_fractional_secs() as f32;
+                        let delta_time = self.time_last_frame.elapsed().as_fractional_secs() as f32;
+
+                        let dt: DateTime<Local> = Local::now();
+
+                        ShadertoyConstants {
+                            iResolution: (w, h, w / h),
+                            pad1: 0.0,
+                            iMouse: (
+                                params.mouse_pos.0 as f32, 
+                                params.mouse_pos.1 as f32, 
+                                params.mouse_click_pos.0 as f32, 
+                                params.mouse_click_pos.1 as f32,
+                            ),
+                            iTime: time,
+                            iTimeDelta: delta_time,
+                            iFrameRate: 1.0 / delta_time,
+                            iSampleRate: 44100.0,
+                            iFrame: self.frame_index as i32,
+                            pad2: [0, 0, 0],
+                            iDate: (
+                                dt.year() as f32,
+                                dt.month() as f32,
+                                dt.day() as f32,
+                                dt.second() as f32, // TODO unclear what seconds should be here?
+                            ),
+                            iChannelTime: [time, time, time, time], // TODO not correct
+                            iChannelResolution: [
+                                (0.0, 0.0, 0.0, 0.0),
+                                (0.0, 0.0, 0.0, 0.0),
+                                (0.0, 0.0, 0.0, 0.0),
+                                (0.0, 0.0, 0.0, 0.0),
+                            ],
+                            iBlockOffset: 0.0,
+                            pad3: [0.0, 0.0, 0.0],
+                        }
+                    };
+
+                    let pipeline = &self.pipelines[quad.pipeline_handle];
+                    let constants_ptr: *const ShadertoyConstants = &constants;
+                    let constants_cptr = constants_ptr as *mut libc::c_void;
 
                     encoder.set_render_pipeline_state(&pipeline.pipeline_state);
                     encoder.set_cull_mode(metal::MTLCullMode::None);
-
-                    let constants_ptr: *const ShadertoyConstants = &constants;
-                    let constants_cptr = constants_ptr as *mut libc::c_void;
                     encoder.set_vertex_bytes(0, mem::size_of::<ShadertoyConstants>() as u64, constants_cptr);
                     encoder.set_fragment_bytes(0, mem::size_of::<ShadertoyConstants>() as u64, constants_cptr);
+                    
+                    encoder.set_viewport(metal::MTLViewport {
+                        originX: (quad.pos.0 * w) as f64,
+                        originY: (quad.pos.1 * h) as f64,
+                        width: (quad.size.0 * w) as f64,
+                        height: (quad.size.1 * h) as f64,
+                        znear: 0.0,
+                        zfar: 1.0,
+                    });
+
                     encoder.draw_primitives(metal::MTLPrimitiveType::Triangle, 0, 3);
                 }
 

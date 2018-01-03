@@ -73,7 +73,7 @@ struct BuiltShadertoy {
     info: shadertoy::ShaderInfo,
 
     shader_source: String,
-    pipeline: Option<RenderPipelineHandle>,
+    pipeline_handle: Option<RenderPipelineHandle>,
     pipeline_failed: bool,
 }
 
@@ -227,7 +227,7 @@ fn download(matches: &clap::ArgMatches) -> Result<Vec<BuiltShadertoy>> {
                     bs.push(BuiltShadertoy {
                         info: shader.info.clone(),
                         shader_source: full_source,
-                        pipeline: None,
+                        pipeline_handle: None,
                         pipeline_failed: false
                     });
                 }
@@ -389,10 +389,14 @@ fn run() -> Result<()> {
 
         let mut running = true;
 
-        let mut cursor_pos = (0.0f64, 0.0f64);
+        let mut mouse_pos = (0.0f64, 0.0f64);
+        let mut mouse_click_pos = (0.0f64, 0.0f64);
+        let mut mouse_lmb_pressed = false;
+        
 
         let mut shadertoy_index = 0usize;
         let mut prev_shadertoy_index = 1usize;
+        let mut draw_grid = false;
         
 
         while running {
@@ -400,7 +404,24 @@ fn run() -> Result<()> {
             events_loop.poll_events(|event| match event {
                 winit::Event::WindowEvent { event: winit::WindowEvent::Closed, .. } => running = false,
                 winit::Event::WindowEvent { event: winit::WindowEvent::CursorMoved { position, .. }, .. } => {
-                    cursor_pos = position;
+                    if mouse_lmb_pressed {
+                        mouse_pos = position;
+                    }
+                }
+                winit::Event::WindowEvent { event: winit::WindowEvent::MouseInput { state, button, .. }, .. } => {
+                    if state == winit::ElementState::Pressed {
+                        if button == winit::MouseButton::Left {
+                            if !mouse_lmb_pressed {
+                                mouse_click_pos = mouse_pos;
+                            }
+                            mouse_lmb_pressed = true;
+                        }
+                    }
+                    else {
+                        mouse_pos = (0.0, 0.0);
+                        mouse_click_pos = (0.0, 0.0);
+                        mouse_lmb_pressed = false;
+                    }
                 }
                 winit::Event::WindowEvent { event: winit::WindowEvent::KeyboardInput { input, .. }, .. } => {
                     if input.state == winit::ElementState::Pressed {
@@ -414,6 +435,9 @@ fn run() -> Result<()> {
                                 if shadertoy_index + 1 < built_shadertoy_shaders.len() {
                                     shadertoy_index += 1;
                                 }
+                            }
+                            Some(winit::VirtualKeyCode::Space) => {
+                                draw_grid = !draw_grid;
                             }
                             _ => (),
                         }
@@ -443,30 +467,53 @@ fn run() -> Result<()> {
 
             // render frame
 
-            let pipeline = {
+            let mut quads: Vec<RenderQuad> = vec![];
 
+            if draw_grid {
+
+                let grid_size = (4, 4);
+
+                for shadertoy in &built_shadertoy_shaders {
+                    if let Some(pipeline_handle) = shadertoy.pipeline_handle {
+                        let index = quads.len();
+                        let grid_pos = (index % grid_size.0, index / grid_size.0 );
+
+                        quads.push(RenderQuad {
+                            pos: ((grid_pos.0 as f32) / (grid_size.0 as f32), (grid_pos.1 as f32) / (grid_size.1 as f32)),
+                            size: (1.0 / (grid_size.0 as f32), 1.0 / (grid_size.1 as f32)),
+                            pipeline_handle,
+                        });
+                    }
+                }
+            } else {
+    
                 if let Some(ref mut shadertoy) = built_shadertoy_shaders.get_mut(shadertoy_index) {
 
-                    if shadertoy.pipeline == None && !shadertoy.pipeline_failed {                        
+                    if shadertoy.pipeline_handle == None && !shadertoy.pipeline_failed {                        
 
                         match render_backend.new_pipeline(shadertoy.shader_source.as_str()) {
-                            Ok(pipeline) => shadertoy.pipeline = Some(pipeline),
+                            Ok(pipeline_handle) => shadertoy.pipeline_handle = Some(pipeline_handle),
                             Err(err) => {
                                 println!("Shader pipeline build failed: {}", err);
                                 shadertoy.pipeline_failed = true;
                             },
                         }
                     }
-                    shadertoy.pipeline
-                } else {
-                    None
-                }
-            };
-    
 
-            render_backend.present(RenderParams {
-                mouse_cursor_pos: cursor_pos,
-                pipeline: pipeline
+                    if let Some(pipeline_handle) = shadertoy.pipeline_handle {
+                        quads.push(RenderQuad {
+                            pos: (0.0, 0.0),
+                            size: (1.0, 1.0),
+                            pipeline_handle,
+                        });
+                    }
+                }
+            }
+
+            render_backend.render_frame(RenderParams {
+                mouse_pos,
+                mouse_click_pos,
+                quads: &quads
             });
 
             #[cfg(target_os = "macos")]
