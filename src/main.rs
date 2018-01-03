@@ -299,14 +299,9 @@ fn download(matches: &clap::ArgMatches) -> Result<Vec<BuiltShadertoy>> {
 fn build(render_backend: &mut RenderBackend, shadertoy: &mut BuiltShadertoy) {
     if shadertoy.pipeline_handle == None && !shadertoy.pipeline_failed {                        
 
-        println!("Building shader for shadertoyshadertoy {} ({} by {})", 
-            shadertoy.info.id.yellow(),
-            shadertoy.info.name.green(), 
-            shadertoy.info.username.blue());
-
         // these shaders get stuck in forever compilation, so let's skip them forn ow
         // TODO should make compilation more robust and be able to timeout and then remove this
-        let skip_shaders = [ "XdsBzj", "XtlSD7", "MlB3Wt" ];
+        let skip_shaders = [ "XdsBzj", "XtlSD7", "MlB3Wt", "4ssfzj", "XllSWf", "4td3z4" ];
         
         if skip_shaders.contains(&shadertoy.info.id.as_str()) {
             shadertoy.pipeline_failed = true;
@@ -372,6 +367,12 @@ fn run() -> Result<()> {
                 .case_insensitive(true),
         )
         .arg(
+            Arg::with_name("buildall")
+                .short("b")
+                .long("buildall")
+                .help("Build all shaders upfront. This is useful to stress test compilation, esp. together with --headless")
+        )
+        .arg(
             Arg::with_name("threads")
                 .short("t")
                 .long("threads")
@@ -404,6 +405,35 @@ fn run() -> Result<()> {
         return Ok(());
     }
 
+
+    let mut render_backend = render_backend.chain_err(|| "skipping rendering, as have no renderer available")?;
+
+
+    if matches.is_present("buildall") {
+        
+        let index = AtomicUsize::new(0);
+        let count = built_shadertoy_shaders.len();
+        let mut success_count = 0;
+        
+        for shadertoy in &mut built_shadertoy_shaders {            
+            
+            println!("Building ({} / {}) {} - {} by {}", 
+                index.fetch_add(1, Ordering::SeqCst), 
+                count,
+                shadertoy.info.id.yellow(),
+                shadertoy.info.name.green(), 
+                shadertoy.info.username.blue());
+            
+            build(&mut *render_backend, shadertoy);
+            
+            if shadertoy.pipeline_handle.is_some() {
+                success_count += 1;
+            }
+        }
+
+        println!("Successfully built {} / {} shaders", success_count, built_shadertoy_shaders.len());
+    }
+
     if !matches.is_present("headless") {
 
         let mut events_loop = winit::EventsLoop::new();
@@ -413,7 +443,6 @@ fn run() -> Result<()> {
             .build(&events_loop)
             .chain_err(|| "error creating window")?;
 
-        let mut render_backend = render_backend.chain_err(|| "skipping rendering, as have no renderer available")?;
         render_backend.init_window(&window);
 
 
