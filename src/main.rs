@@ -493,12 +493,13 @@ fn run() -> Result<()> {
 
                 let start_index = shadertoy_index / shadertoy_increment * shadertoy_increment;
 
-                for shadertoy in &mut built_shadertoy_shaders[start_index .. ] {
+                for index in 0..shadertoy_increment {
+
+                    if let Some(ref mut shadertoy) = built_shadertoy_shaders.get_mut(start_index + index) {
 
                     build(&mut *render_backend, shadertoy);
 
                     if let Some(pipeline_handle) = shadertoy.pipeline_handle {
-                        let index = quads.len();
                         let grid_pos = (index % grid_size.0, index / grid_size.0 );
 
                         quads.push(RenderQuad {
@@ -513,6 +514,7 @@ fn run() -> Result<()> {
                             pipeline_handle,
                         });
                     }
+                }
                 }
             } else {
     
