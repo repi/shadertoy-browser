@@ -410,7 +410,7 @@ fn run() -> Result<()> {
 
         let mut shadertoy_index = 0usize;
         let mut draw_grid = true;
-        let grid_size = (4, 4);
+        let grid_size = (5, 5);
         
         while running {
 
@@ -524,7 +524,11 @@ fn run() -> Result<()> {
 
             let active_shadertoy = built_shadertoy_shaders.get(shadertoy_index);
 
-            if !draw_grid && active_shadertoy.is_some() {
+            if draw_grid && built_shadertoy_shaders.len() > 0 {
+                window.set_title(&format!("Shadertoy ({} / {})", 
+                    shadertoy_index+1, 
+                    built_shadertoy_shaders.len()));
+            } else if active_shadertoy.is_some() {
                 window.set_title(&format!("Shadertoy ({} / {}) - {} by {}", 
                     shadertoy_index+1, 
                     built_shadertoy_shaders.len(), 
@@ -535,6 +539,13 @@ fn run() -> Result<()> {
             }            
 
             render_backend.render_frame(RenderParams {
+                clear_color: {
+                    if draw_grid {
+                        (0.0, 0.0, 0.0, 0.0)
+                    } else {
+                        (1.0, 0.0, 0.0, 1.0)
+                    }
+                },
                 mouse_pos: mouse_pressed_pos,
                 mouse_click_pos,
                 quads: &quads

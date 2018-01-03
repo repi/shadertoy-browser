@@ -42,6 +42,7 @@ pub struct RenderQuad {
 }
 
 pub struct RenderParams<'a> {
+    pub clear_color: (f32, f32, f32, f32),
     pub mouse_pos: (f64, f64),
     pub mouse_click_pos: (f64, f64),
     pub quads: &'a[RenderQuad],

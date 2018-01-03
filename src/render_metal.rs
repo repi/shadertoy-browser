@@ -136,7 +136,11 @@ impl RenderBackend for MetalRenderBackend {
                     .unwrap();
                 color_attachment.set_texture(Some(drawable.texture()));
                 color_attachment.set_load_action(metal::MTLLoadAction::Clear);
-                color_attachment.set_clear_color(metal::MTLClearColor::new(1.0, 0.0, 0.0, 1.0));
+                color_attachment.set_clear_color(metal::MTLClearColor::new(
+                    params.clear_color.0 as f64,
+                    params.clear_color.1 as f64,
+                    params.clear_color.2 as f64,
+                    params.clear_color.3 as f64));
                 color_attachment.set_store_action(metal::MTLStoreAction::Store);
 
                 let command_buffer = self.command_queue.new_command_buffer();
@@ -170,7 +174,11 @@ impl RenderBackend for MetalRenderBackend {
                         }
 
                         ShadertoyConstants {
-                            iResolution: (w, h, w / h),
+                            iResolution: (
+                                (quad.size.0 * w), 
+                                (quad.size.1 * h), 
+                                w / h
+                            ),
                             pad1: 0.0,
                             iMouse: mouse,
                             iTime: time,
