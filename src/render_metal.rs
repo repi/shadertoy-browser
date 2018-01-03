@@ -154,7 +154,7 @@ impl RenderBackend for MetalRenderBackend {
 
                         let dt: DateTime<Local> = Local::now();
 
-                        let mut iMouse = (
+                        let mut mouse = (
                             (params.mouse_pos.0 as f32) / self.dpi_factor, 
                             (params.mouse_pos.1 as f32) / self.dpi_factor, 
                             (params.mouse_click_pos.0 as f32) / self.dpi_factor, 
@@ -162,17 +162,17 @@ impl RenderBackend for MetalRenderBackend {
                         );
 
                         // flip y
-                        if iMouse.1 > 0.0 {
-                            iMouse.1 = h - iMouse.1;
+                        if mouse.1 > 0.0 {
+                            mouse.1 = h - mouse.1;
                         }
-                        if iMouse.3 > 0.0 {
-                            iMouse.3 = h - iMouse.3;
+                        if mouse.3 > 0.0 {
+                            mouse.3 = h - mouse.3;
                         }
 
                         ShadertoyConstants {
                             iResolution: (w, h, w / h),
                             pad1: 0.0,
-                            iMouse,
+                            iMouse: mouse,
                             iTime: time,
                             iTimeDelta: delta_time,
                             iFrameRate: 1.0 / delta_time,
