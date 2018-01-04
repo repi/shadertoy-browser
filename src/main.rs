@@ -389,14 +389,17 @@ fn run() -> Result<()> {
         )
         .get_matches();
 
-
     // setup renderer
 
     let render_backend: Option<Box<RenderBackend>>;
 
-    if cfg!(target_os = "macos") {
+    #[cfg(target_os="macos")]
+    {
         render_backend = Some(Box::new(MetalRenderBackend::new()));
-    } else {
+    }
+
+    #[cfg(not(target_os="macos"))]
+    {
         render_backend = None;
     }
 
