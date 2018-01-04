@@ -1,6 +1,8 @@
 # Rusty Shadertoy Browser
 
-[![Build Status](https://travis-ci.com/repi/shadertoy-browser.svg?token=8SzG1tHkq3FpBRftmohU&branch=master)](https://travis-ci.com/repi/shadertoy-browser) ![MIT/Apache](https://img.shields.io/badge/license-MIT%2FApache-blue.svg)
+[![Crate](https://img.shields.io/crates/v/shadertoy-browser.svg)](https://crates.io/crates/shadertoy-browser)
+[![Build Status](https://travis-ci.com/repi/shadertoy-browser.svg?token=8SzG1tHkq3FpBRftmohU&branch=master)](https://travis-ci.com/repi/shadertoy-browser)
+![MIT/Apache](https://img.shields.io/badge/license-MIT%2FApache-blue.svg)
 
 Small [Shadertoy](http://shadertoy.com) browser & viewer for Mac built in [Rust](https://www.rust-lang.org).
 
@@ -8,7 +10,8 @@ This application uses the [Shadertoy REST API](http://shadertoy.com/api) to sear
 
 The API queries are done through the [`shadertoy`](https://crates.io/crates/shadertoy) crate, which is also part of this repository in [`src/shadertoy`](src/shadertoy)
 
-![Render](ScreenshotRender.jpg) ![Output](ScreenshotOutput.jpg)
+![Render](https://raw.githubusercontent.com/repi/shadertoy-browser/master/ScreenshotRender.jpg?token=ABNEZJ60PVG0ncu_xnMImD4OMbP0Wc1vks5aVspLwA%3D%3D)
+![Output](https://raw.githubusercontent.com/repi/shadertoy-browser/master/ScreenshotOutput.jpg?token=ABNEZOX6bEUtIh8T5W82SeuXlcWBcNUNks5aVsrcwA%3D%3D)
 
 ## Building
 
