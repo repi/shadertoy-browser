@@ -389,6 +389,11 @@ fn run() -> Result<()> {
         )
         .get_matches();
 
+    if cfg!(target_os="windows") {
+        // disable colored text output on Windows as the Windows terminals do not support it yet
+        colored::control::set_override(false);
+    }
+
     // setup renderer
 
     let render_backend: Option<Box<RenderBackend>>;
