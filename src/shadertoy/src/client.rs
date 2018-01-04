@@ -114,8 +114,6 @@ impl Client {
                 format!("filter={:?}&", f).to_lowercase()).collect::<String>(),
             self.api_key);
 
-        println!("{}", &query_str);
-
         let json_str = self.rest_client.get(&query_str).send()?.text()?;
 
         #[derive(Serialize, Deserialize, Debug)]
