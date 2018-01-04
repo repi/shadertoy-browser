@@ -81,9 +81,9 @@ struct BuiltShadertoy {
 }
 
 
-fn write_file(path: &Path, buf: &[u8]) -> Result<()> {
+fn write_file<P: AsRef<Path>>(path: P, buf: &[u8]) -> Result<()> {
 
-    if let Some(parent_path) = path.parent() {
+    if let Some(parent_path) = path.as_ref().parent() {
         match std::fs::create_dir_all(parent_path) {
             Err(why) => println!("couldn't create directory: {:?}", why.kind()),
             Ok(_) => {}
@@ -117,7 +117,7 @@ fn search(client: &shadertoy::Client, matches: &clap::ArgMatches) -> Result<Vec<
 
     // check if we can find a cached search on disk
 
-    let path = PathBuf::from(&format!("output/query/{}", serde_json::to_string(&search_params)?.as_bytes().to_base58()));
+    let path = format!("output/query/{}", serde_json::to_string(&search_params)?.as_bytes().to_base58());
 
     if let Ok(mut file) = File::open(&path) {
         let mut json_str = String::new();
@@ -221,7 +221,7 @@ fn download(matches: &clap::ArgMatches) -> Result<Vec<BuiltShadertoy>> {
                 let full_source = format!("{}\n{}\n{}\n{}", header_source, sampler_source, pass.code, footer_source);
 
                 // save out the source GLSL file, for debugging
-                let glsl_path = PathBuf::from(format!("output/shader/{}/{}{}.glsl", shadertoy, shadertoy, pass.name));
+                let glsl_path = format!("output/shader/{}/{}{}.glsl", shadertoy, shadertoy, pass.name);
                 write_file(&glsl_path, full_source.as_bytes())?;
 
                 if pass.pass_type == "image" && pass.inputs.len() == 0 {
