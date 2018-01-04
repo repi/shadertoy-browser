@@ -49,6 +49,10 @@ pub struct MetalRenderBackend {
     pipelines: Mutex<RefCell<Vec<MetalRenderPipeline>>>,
 }
 
+unsafe impl Sync for MetalRenderBackend {
+    
+}
+
 impl MetalRenderBackend {
     pub fn new() -> MetalRenderBackend {
         let device = metal::Device::system_default();

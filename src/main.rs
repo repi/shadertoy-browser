@@ -29,6 +29,8 @@ use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
+use std::time::Instant;
+use floating_duration::{TimeAsFloat};
 use clap::{Arg, App};   
 use rayon::prelude::*;
 use base58::ToBase58;
@@ -296,7 +298,7 @@ fn download(matches: &clap::ArgMatches) -> Result<Vec<BuiltShadertoy>> {
     Ok(built_shadertoys.into_inner().unwrap())
 }
 
-fn build(render_backend: &mut RenderBackend, shadertoy: &mut BuiltShadertoy) {
+fn build(render_backend: &RenderBackend, shadertoy: &mut BuiltShadertoy) {
     if shadertoy.pipeline_handle == None && !shadertoy.pipeline_failed {                        
 
         // these shaders get stuck in forever compilation, so let's skip them forn ow
@@ -413,9 +415,12 @@ fn run() -> Result<()> {
         
         let index = AtomicUsize::new(0);
         let count = built_shadertoy_shaders.len();
-        let mut success_count = 0;
+        let success_count = AtomicUsize::new(0);;
         
-        for shadertoy in &mut built_shadertoy_shaders {            
+        let time = Instant::now();
+
+        //for shadertoy in &mut built_shadertoy_shaders {            
+        built_shadertoy_shaders.par_iter_mut().for_each(|shadertoy| {
             
             println!("Building ({} / {}) {} - {} by {}", 
                 index.fetch_add(1, Ordering::SeqCst), 
@@ -424,14 +429,18 @@ fn run() -> Result<()> {
                 shadertoy.info.name.green(), 
                 shadertoy.info.username.blue());
             
-            build(&mut *render_backend, shadertoy);
+            build(&*render_backend, shadertoy);
             
             if shadertoy.pipeline_handle.is_some() {
-                success_count += 1;
+                success_count.fetch_add(1, Ordering::SeqCst); 
             }
-        }
+        });
 
-        println!("Successfully built {} / {} shaders", success_count, built_shadertoy_shaders.len());
+        println!(
+            "Successfully built {} / {} shaders in {:.2} seconds", 
+            success_count.load(Ordering::SeqCst), 
+            built_shadertoy_shaders.len(),
+            time.elapsed().as_fractional_secs());
     }
 
     if !matches.is_present("headless") {
@@ -547,7 +556,7 @@ fn run() -> Result<()> {
 
                     if let Some(ref mut shadertoy) = built_shadertoy_shaders.get_mut(start_index + index) {
 
-                        build(&mut *render_backend, shadertoy);
+                        build(&*render_backend, shadertoy);
 
                         if let Some(pipeline_handle) = shadertoy.pipeline_handle {
                             let grid_pos = (index % grid_size.0, index / grid_size.0 );
@@ -570,7 +579,7 @@ fn run() -> Result<()> {
     
                 if let Some(ref mut shadertoy) = built_shadertoy_shaders.get_mut(shadertoy_index) {
 
-                    build(&mut *render_backend, shadertoy);
+                    build(&*render_backend, shadertoy);
 
                     if let Some(pipeline_handle) = shadertoy.pipeline_handle {
                         quads.push(RenderQuad {
