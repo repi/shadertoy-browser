@@ -44,8 +44,6 @@ USAGE:
     shadertoy-browser [FLAGS] [OPTIONS]
 
 FLAGS:
-    -b, --buildall    Build all shaders upfront. This is useful to stress test compilation, esp. together with
-                      --headless
         --help        Prints help information
     -h, --headless    Don't render, only download shadertoys
     -V, --version     Prints version information

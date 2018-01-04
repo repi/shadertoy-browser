@@ -52,5 +52,5 @@ pub trait RenderBackend : Sync {
     fn init_window(&mut self, window: &Any);
     fn render_frame(&mut self, params: RenderParams);
 
-    fn new_pipeline(&self, shader_source: &str) -> Result<RenderPipelineHandle>;
+    fn new_pipeline(&self, shader_path: &str, shader_source: &str) -> Result<RenderPipelineHandle>;
 }

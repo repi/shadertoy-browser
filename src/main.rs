@@ -75,9 +75,9 @@ struct BuiltShadertoy {
 
     info: shadertoy::ShaderInfo,
 
-    shader_source: String,
-    pipeline_handle: Option<RenderPipelineHandle>,
-    pipeline_failed: bool,
+    //shader_path: String,
+    //shader_source: String,
+    pipeline_handle: RenderPipelineHandle,
 }
 
 
@@ -137,7 +137,12 @@ fn search(client: &shadertoy::Client, matches: &clap::ArgMatches) -> Result<Vec<
     }
 }
 
-fn download(matches: &clap::ArgMatches) -> Result<Vec<BuiltShadertoy>> {
+fn download(
+    matches: &clap::ArgMatches, 
+    render_backend: &Option<Box<RenderBackend>>) -> Result<Vec<BuiltShadertoy>> 
+{
+
+    let time = Instant::now();
 
     let api_key = matches.value_of("apikey").unwrap();
     let client = shadertoy::Client::new(api_key);
@@ -216,23 +221,45 @@ fn download(matches: &clap::ArgMatches) -> Result<Vec<BuiltShadertoy>> {
                     "sound" => sound_footer_source,
                     _ => image_footer_source,
                 };
-
+ 
                 // add our header source first which includes shadertoy constant & resource definitions
                 let full_source = format!("{}\n{}\n{}\n{}", header_source, sampler_source, pass.code, footer_source);
 
                 // save out the source GLSL file, for debugging
-                let glsl_path = format!("output/shader/{}/{}{}.glsl", shadertoy, shadertoy, pass.name);
+                let shader_path = format!("output/shader/{}/{}{}", shadertoy, shadertoy, pass.name);
+                let glsl_path = format!("{}.glsl", shader_path);
                 write_file(&glsl_path, full_source.as_bytes())?;
 
-                if pass.pass_type == "image" && pass.inputs.len() == 0 {
+                // we currently only support single-pass image shaders, with no inputs
+                if pass.pass_type == "image" && pass.inputs.len() == 0 && shader.renderpass.len() == 1 {
 
-                    let mut bs = built_shadertoys.lock().unwrap();
-                    bs.push(BuiltShadertoy {
-                        info: shader.info.clone(),
-                        shader_source: full_source,
-                        pipeline_handle: None,
-                        pipeline_failed: false
-                    });
+                    // these shaders get stuck in forever compilation, so let's skip them forn ow
+                    // TODO should make compilation more robust and be able to timeout and then remove this
+                    let skip_shaders = [ "XdsBzj", "XtlSD7", "MlB3Wt", "4ssfzj", "XllSWf", "4td3z4" ];
+                    
+                    if skip_shaders.contains(&shader.info.id.as_str()) {
+                        continue;
+                    }
+
+                    if let &Some(ref rb) = render_backend {
+                        match rb.new_pipeline(&shader_path, full_source.as_str()) {
+                            Ok(pipeline_handle) => {
+                                let mut bs = built_shadertoys.lock().unwrap();
+                                bs.push(BuiltShadertoy {
+                                    info: shader.info.clone(),
+                                    pipeline_handle,
+                                });
+                            },
+                            Err(_err) => {
+                            /*
+                                println!("Failed building shader for shadertoy {} ({} by {})", 
+                                    shadertoy.info.id.yellow(),
+                                    shadertoy.info.name.green(), 
+                                    shadertoy.info.username.blue());
+                            */
+                            },
+                        }
+                    }
                 }
                             
                 // download texture inputs
@@ -258,15 +285,7 @@ fn download(matches: &clap::ArgMatches) -> Result<Vec<BuiltShadertoy>> {
                         println!("Asset downloaded: {}, {} bytes", input.src, data.len());
 
                         write_file(&path, &data)?;
-                    } else {
-
-                    /*
-                        if let Ok(metadata) = path.metadata() {
-                            println!("Asset: {}, {} bytes", input.src, metadata.len());
-                        }
-                    */
-                    }
-
+                    } 
                 }
             }
 
@@ -295,34 +314,14 @@ fn download(matches: &clap::ArgMatches) -> Result<Vec<BuiltShadertoy>> {
         }
     }
 
-    Ok(built_shadertoys.into_inner().unwrap())
-}
+    let built_shadertoys = built_shadertoys.into_inner().unwrap();
 
-fn build(render_backend: &RenderBackend, shadertoy: &mut BuiltShadertoy) {
-    if shadertoy.pipeline_handle == None && !shadertoy.pipeline_failed {                        
+    println!("{} / {} shadertoys built successfully in {:.2} seconds", 
+        built_shadertoys.len(), 
+        shadertoys_len,
+        time.elapsed().as_fractional_secs());
 
-        // these shaders get stuck in forever compilation, so let's skip them forn ow
-        // TODO should make compilation more robust and be able to timeout and then remove this
-        let skip_shaders = [ "XdsBzj", "XtlSD7", "MlB3Wt", "4ssfzj", "XllSWf", "4td3z4" ];
-        
-        if skip_shaders.contains(&shadertoy.info.id.as_str()) {
-            shadertoy.pipeline_failed = true;
-            println!("Skipping");
-            return;
-        }
-
-        match render_backend.new_pipeline(shadertoy.shader_source.as_str()) {
-            Ok(pipeline_handle) => shadertoy.pipeline_handle = Some(pipeline_handle),
-            Err(err) => {
-                println!("Failed building shader for shadertoy {} ({} by {}): {}", 
-                    shadertoy.info.id.yellow(),
-                    shadertoy.info.name.green(), 
-                    shadertoy.info.username.blue(),
-                    err);
-                shadertoy.pipeline_failed = true;
-            },
-        }
-    }    
+    Ok(built_shadertoys)
 }
 
 fn run() -> Result<()> {
@@ -369,12 +368,6 @@ fn run() -> Result<()> {
                 .case_insensitive(true),
         )
         .arg(
-            Arg::with_name("buildall")
-                .short("b")
-                .long("buildall")
-                .help("Build all shaders upfront. This is useful to stress test compilation, esp. together with --headless")
-        )
-        .arg(
             Arg::with_name("threads")
                 .short("t")
                 .long("threads")
@@ -408,48 +401,13 @@ fn run() -> Result<()> {
         render_backend = None;
     }
 
-
-    let mut built_shadertoy_shaders = download(&matches).chain_err(|| "query for shaders failed")?;
+    let mut built_shadertoy_shaders = download(&matches, &render_backend).chain_err(|| "query for shaders failed")?;
 
     if built_shadertoy_shaders.len() == 0 {
         return Ok(());
     }
 
-
     let mut render_backend = render_backend.chain_err(|| "skipping rendering, as have no renderer available")?;
-
-
-    if matches.is_present("buildall") {
-        
-        let index = AtomicUsize::new(0);
-        let count = built_shadertoy_shaders.len();
-        let success_count = AtomicUsize::new(0);;
-        
-        let time = Instant::now();
-
-        //for shadertoy in &mut built_shadertoy_shaders {            
-        built_shadertoy_shaders.par_iter_mut().for_each(|shadertoy| {
-            
-            println!("Building ({} / {}) {} - {} by {}", 
-                index.fetch_add(1, Ordering::SeqCst), 
-                count,
-                shadertoy.info.id.yellow(),
-                shadertoy.info.name.green(), 
-                shadertoy.info.username.blue());
-            
-            build(&*render_backend, shadertoy);
-            
-            if shadertoy.pipeline_handle.is_some() {
-                success_count.fetch_add(1, Ordering::SeqCst); 
-            }
-        });
-
-        println!(
-            "Successfully built {} / {} shaders in {:.2} seconds", 
-            success_count.load(Ordering::SeqCst), 
-            built_shadertoy_shaders.len(),
-            time.elapsed().as_fractional_secs());
-    }
 
     if !matches.is_present("headless") {
 
@@ -476,7 +434,7 @@ fn run() -> Result<()> {
 
         let mut shadertoy_index = 0usize;
         let mut draw_grid = true;
-        let grid_size = (5, 5);
+        let grid_size = (4, 4);
         
         while running {
 
@@ -516,7 +474,9 @@ fn run() -> Result<()> {
                                 shadertoy_index = shadertoy_index.saturating_sub(shadertoy_increment);
                             }
                             Some(winit::VirtualKeyCode::Right) => {
-                                shadertoy_index += shadertoy_increment;
+                                if shadertoy_index + shadertoy_increment < built_shadertoy_shaders.len() {
+                                    shadertoy_index += shadertoy_increment;
+                                }
                             }
                             Some(winit::VirtualKeyCode::Space) => {
                                 draw_grid = !draw_grid;
@@ -548,8 +508,6 @@ fn run() -> Result<()> {
                 }
                 _ => (),
             });
-
-            shadertoy_index = shadertoy_index.min(built_shadertoy_shaders.len());
             
 
             // render frame
@@ -562,41 +520,30 @@ fn run() -> Result<()> {
                 
                 for index in 0..shadertoy_increment {
 
-                    if let Some(ref mut shadertoy) = built_shadertoy_shaders.get_mut(start_index + index) {
+                    if let Some(ref shadertoy) = built_shadertoy_shaders.get(start_index + index) {
 
-                        build(&*render_backend, shadertoy);
+                        let grid_pos = (index % grid_size.0, index / grid_size.0 );
 
-                        if let Some(pipeline_handle) = shadertoy.pipeline_handle {
-                            let grid_pos = (index % grid_size.0, index / grid_size.0 );
-
-                            quads.push(RenderQuad {
-                                pos: (
-                                    (grid_pos.0 as f32) / (grid_size.0 as f32), 
-                                    (grid_pos.1 as f32) / (grid_size.1 as f32)
-                                ),
-                                size: (
-                                    1.0 / (grid_size.0 as f32), 
-                                    1.0 / (grid_size.1 as f32)
-                                ),
-                                pipeline_handle,
-                            });
-                        }
-                    }
-                }
-            } else {
-    
-                if let Some(ref mut shadertoy) = built_shadertoy_shaders.get_mut(shadertoy_index) {
-
-                    build(&*render_backend, shadertoy);
-
-                    if let Some(pipeline_handle) = shadertoy.pipeline_handle {
                         quads.push(RenderQuad {
-                            pos: (0.0, 0.0),
-                            size: (1.0, 1.0),
-                            pipeline_handle,
+                            pos: (
+                                (grid_pos.0 as f32) / (grid_size.0 as f32), 
+                                (grid_pos.1 as f32) / (grid_size.1 as f32)
+                            ),
+                            size: (
+                                1.0 / (grid_size.0 as f32), 
+                                1.0 / (grid_size.1 as f32)
+                            ),
+                            pipeline_handle: shadertoy.pipeline_handle,
                         });
                     }
                 }
+            } else if let Some(ref shadertoy) = built_shadertoy_shaders.get(shadertoy_index) {
+
+                quads.push(RenderQuad {
+                    pos: (0.0, 0.0),
+                    size: (1.0, 1.0),
+                    pipeline_handle: shadertoy.pipeline_handle,
+                });
             }
 
             // update window title
@@ -618,7 +565,7 @@ fn run() -> Result<()> {
             }            
 
             render_backend.render_frame(RenderParams {
-                clear_color: (1.0, 0.0, 0.0, 1.0),
+                clear_color: (0.0, 0.0, 0.0, 0.0),
                 mouse_pos: mouse_pressed_pos,
                 mouse_click_pos,
                 quads: &quads

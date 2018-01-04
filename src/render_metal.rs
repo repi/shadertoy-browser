@@ -29,6 +29,28 @@ use chrono::prelude::*;
 use render::*;
 use errors::*;
 
+use std;
+use std::fs::File;
+use std::path::{Path, PathBuf};
+use std::io::Write;
+use std::io::prelude::*;
+
+fn write_file<P: AsRef<Path>>(path: P, buf: &[u8]) -> Result<()> {
+
+    if let Some(parent_path) = path.as_ref().parent() {
+        match std::fs::create_dir_all(parent_path) {
+            Err(why) => println!("couldn't create directory: {:?}", why.kind()),
+            Ok(_) => {}
+        }
+    } 
+    
+    let mut file = File::create(&path)?;
+    file.write_all(buf)?;
+    Ok(())
+}
+
+
+
 struct MetalRenderPipeline {
     pipeline_state: metal::RenderPipelineState,
 }
@@ -95,8 +117,7 @@ impl MetalRenderBackend {
             .unwrap()
             .set_pixel_format(metal::MTLPixelFormat::BGRA8Unorm);
 
-        //return self.device.new_render_pipeline_state(&pipeline_desc);
-        return new_render_pipeline_state(&self.device, &pipeline_desc);
+        new_render_pipeline_state(&self.device, &pipeline_desc)
     }
 }
 
@@ -238,12 +259,22 @@ impl RenderBackend for MetalRenderBackend {
         }
     }
 
-    fn new_pipeline(&self, shader_source: &str) -> Result<RenderPipelineHandle> {
-        let metal_source = convert_glsl_to_metal("unknown name", "main", shader_source)?;
+    fn new_pipeline(&self, shader_path: &str, shader_source: &str) -> Result<RenderPipelineHandle> {
 
         // save out the generated Metal file, for debugging
-        // let msl_path = PathBuf::from(format!("output/shader/{} {}.metal", shadertoy, pass.name));
-        // write_file(&msl_path, full_source_metal.as_bytes())?;
+
+        let metal_path = PathBuf::from(format!("{}.metal", shader_path));
+
+        let metal_source;
+
+        if let Ok(mut file) = File::open(&metal_path) {
+            let mut str = String::new();
+            file.read_to_string(&mut str).chain_err(|| "failed reading metal shader file")?;
+            metal_source = str;
+        } else {
+            metal_source = convert_glsl_to_metal("unknown name", "main", shader_source)?;
+            write_file(&metal_path, metal_source.as_bytes())?;
+        }
 
         let pipeline = MetalRenderPipeline {
             pipeline_state: self.create_pipeline_state(&metal_source)?,
@@ -290,7 +321,7 @@ fn new_library_with_source(device: &metal::Device, src: &str, options: &metal::C
             return Err(message.into());
         }
 
-        return Err("unreachable?".into());
+        Err("unreachable?".into())
     }
 }
 
