@@ -30,7 +30,7 @@ fn test() {
         filters: vec![],
     };
 
-    match client.search(search_params) {
+    match client.search(&search_params) {
         Ok(shader_ids) => println!("\"Car\" shadertoys: {:?}", shader_ids),
         Err(err) => println!("Search failed: {}", err),
     }

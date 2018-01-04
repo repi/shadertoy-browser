@@ -24,7 +24,7 @@ pub enum SearchFilter {
     MusicStream
 }
 
-/// Search parameters for Client::search.
+/// Search parameters for `Client::search`.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct SearchParams<'a> {
     /// Search string, set as empty to get ALL shadertoys.
@@ -96,13 +96,13 @@ impl Client {
     ///     sort_order: shadertoy::SearchSortOrder::Love,
     ///     filters: vec![],
     /// };
-    /// match client.search(search_params) {
+    /// match client.search(&search_params) {
     /// 	Ok(shader_ids) => println!("\"Car\" shadertoys: {:?}", shader_ids),
     /// 	Err(err) => println!("Search failed: {}", err),
     /// }
     /// # }
     /// ```
-    pub fn search(&self, params: SearchParams) -> Result<Vec<String>> {
+    pub fn search(&self, params: &SearchParams) -> Result<Vec<String>> {
 
         let query_str = format!("https://www.shadertoy.com/api/v1/shaders{}?sort={}&{}key={}", 
             match params.string.is_empty() {
@@ -139,10 +139,10 @@ impl Client {
                 if !r.error.is_empty() {
                     bail!("Shadertoy REST search query returned error: {}", r.error);
                 }
-                return Ok(r.results);
+                Ok(r.results)
             },
             Err(err) => {
-                return Err(Error::from(err)).chain_err(|| "JSON parsing of Shadertoy search result failed");
+                Err(Error::from(err)).chain_err(|| "JSON parsing of Shadertoy search result failed")
             }
         }
     }
@@ -171,10 +171,10 @@ impl Client {
                 if !r.error.is_empty() {
                     bail!("Shadertoy REST shader query returned error: {}", r.error);
                 }
-                return Ok(r.shader);
+                Ok(r.shader)
             },
             Err(err) => {
-                return Err(Error::from(err)).chain_err(|| "JSON parsing of Shadertoy shader rootfailed");
+                Err(Error::from(err)).chain_err(|| "JSON parsing of Shadertoy shader rootfailed")
             }
         }
     }

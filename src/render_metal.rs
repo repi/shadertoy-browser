@@ -38,10 +38,7 @@ use std::io::prelude::*;
 fn write_file<P: AsRef<Path>>(path: P, buf: &[u8]) -> Result<()> {
 
     if let Some(parent_path) = path.as_ref().parent() {
-        match std::fs::create_dir_all(parent_path) {
-            Err(why) => println!("couldn't create directory: {:?}", why.kind()),
-            Ok(_) => {}
-        }
+        std::fs::create_dir_all(parent_path)?;
     } 
     
     let mut file = File::create(&path)?;
@@ -140,7 +137,7 @@ impl RenderBackend for MetalRenderBackend {
         }
 
         let draw_size = winit_window.get_inner_size().unwrap();
-        layer.set_drawable_size(NSSize::new(draw_size.0 as f64, draw_size.1 as f64));
+        layer.set_drawable_size(NSSize::new(draw_size.0.into(), draw_size.1.into()));
 
         self.layer = Some(layer);
 
@@ -160,15 +157,15 @@ impl RenderBackend for MetalRenderBackend {
                 color_attachment.set_texture(Some(drawable.texture()));
                 color_attachment.set_load_action(metal::MTLLoadAction::Clear);
                 color_attachment.set_clear_color(metal::MTLClearColor::new(
-                    params.clear_color.0 as f64,
-                    params.clear_color.1 as f64,
-                    params.clear_color.2 as f64,
-                    params.clear_color.3 as f64,
+                    params.clear_color.0.into(),
+                    params.clear_color.1.into(),
+                    params.clear_color.2.into(),
+                    params.clear_color.3.into(),
                 ));
                 color_attachment.set_store_action(metal::MTLStoreAction::Store);
 
                 let command_buffer = self.command_queue.new_command_buffer();
-                let parallel_encoder = command_buffer.new_parallel_render_command_encoder(&render_pass_descriptor);
+                let parallel_encoder = command_buffer.new_parallel_render_command_encoder(render_pass_descriptor);
                 let encoder = parallel_encoder.render_command_encoder();
 
                 let w = drawable.texture().width() as f32;
@@ -236,10 +233,10 @@ impl RenderBackend for MetalRenderBackend {
                     encoder.set_fragment_bytes(0, mem::size_of::<ShadertoyConstants>() as u64, constants_cptr);
 
                     encoder.set_viewport(metal::MTLViewport {
-                        originX: (quad.pos.0 * w) as f64,
-                        originY: (quad.pos.1 * h) as f64,
-                        width: (quad.size.0 * w) as f64,
-                        height: (quad.size.1 * h) as f64,
+                        originX: (quad.pos.0 * w).into(),
+                        originY: (quad.pos.1 * h).into(),
+                        width: (quad.size.0 * w).into(),
+                        height: (quad.size.1 * h).into(),
                         znear: 0.0,
                         zfar: 1.0,
                     });
@@ -250,7 +247,7 @@ impl RenderBackend for MetalRenderBackend {
                 encoder.end_encoding();
                 parallel_encoder.end_encoding();
 
-                command_buffer.present_drawable(&drawable);
+                command_buffer.present_drawable(drawable);
                 command_buffer.commit();
 
                 self.frame_index += 1;

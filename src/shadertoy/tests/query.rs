@@ -7,18 +7,18 @@ fn test_query() {
     // try connecting to shadertoy.com and search for all "car" shadertoys
     // this of course requires one to be online
     let query = client
-        .search(shadertoy::SearchParams {
+        .search(&shadertoy::SearchParams {
             string: "car",
             sort_order: shadertoy::SearchSortOrder::Popular,
             filters: vec![shadertoy::SearchFilter::MultiPass],
         })
         .unwrap();
 
-    assert!(query.len() > 0);
+    assert!(!query.is_empty());
 
     // get the first shader in the list
     let shader = client.get_shader(&query[0]).unwrap();
-    assert!(shader.renderpass.len() > 0);
+    assert!(!shader.renderpass.is_empty());
 
     // try getting a specific shader, this should suceed
     let shader = client.get_shader("4d2BDy");

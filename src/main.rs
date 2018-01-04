@@ -84,10 +84,7 @@ struct BuiltShadertoy {
 fn write_file<P: AsRef<Path>>(path: P, buf: &[u8]) -> Result<()> {
 
     if let Some(parent_path) = path.as_ref().parent() {
-        match std::fs::create_dir_all(parent_path) {
-            Err(why) => println!("couldn't create directory: {:?}", why.kind()),
-            Ok(_) => {}
-        }
+        std::fs::create_dir_all(parent_path)?;
     } 
     
     let mut file = File::create(&path)?;
@@ -125,13 +122,13 @@ fn search(client: &shadertoy::Client, matches: &clap::ArgMatches) -> Result<Vec<
         search_result.chain_err(|| "shader query json deserialization failed")
     } else {
         // issue the actual request
-        match client.search(search_params).chain_err(|| "shadertoy search failed") {
+        match client.search(&search_params).chain_err(|| "shadertoy search failed") {
             Ok(result) => {
                 // cache search results to a file on disk
                 write_file(&path, serde_json::to_string(&result)?.as_bytes())?;
                 Ok(result)
             }
-            Err(err) => Err(err.into()),
+            Err(err) => Err(err),
         }
     }
 }
@@ -181,7 +178,7 @@ fn download(
                 shader.info.viewed,
                 shader.info.likes);
 
-            for pass in shader.renderpass.iter() {
+            for pass in &shader.renderpass {
 
                 // generate a GLSL snippet containing the sampler declarations
                 // as they are dependent on the renderpass inputs in the JSON
@@ -192,7 +189,7 @@ fn download(
                 //     uniform sampler2D iChannel3;
 
                 let mut sampler_source = String::new();
-                for input in pass.inputs.iter() {
+                for input in &pass.inputs {
                     let glsl_type = match input.ctype.as_str() {
                         "texture" => "sampler2D",
                         "volume" => "sampler3D",
@@ -207,7 +204,7 @@ fn download(
                         _ => {
                             panic!("Unknown ctype: {}", input.ctype);
                         }
-                    };
+                    };                
                     sampler_source.push_str(&format!("uniform {} iChannel{};\n", glsl_type, input.channel));
                 }
 
@@ -229,7 +226,7 @@ fn download(
                 write_file(&glsl_path, full_source.as_bytes())?;
 
                 // we currently only support single-pass image shaders, with no inputs
-                if pass.pass_type == "image" && pass.inputs.len() == 0 && shader.renderpass.len() == 1 {
+                if pass.pass_type == "image" && pass.inputs.is_empty() && shader.renderpass.len() == 1 {
 
                     // these shaders get stuck in forever compilation, so let's skip them forn ow
                     // TODO should make compilation more robust and be able to timeout and then remove this
@@ -239,7 +236,7 @@ fn download(
                         continue;
                     }
 
-                    if let &Some(ref rb) = render_backend {
+                    if let Some(ref rb) = *render_backend {
                         match rb.new_pipeline(&shader_path, full_source.as_str()) {
                             Ok(pipeline_handle) => {
                                 let mut bs = built_shadertoys.lock().unwrap();
@@ -262,7 +259,7 @@ fn download(
                             
                 // download texture inputs
 
-                for input in pass.inputs.iter() {
+                for input in &pass.inputs {
 
                     match input.ctype.as_str() {
                         "texture" | "volume" | "cubemap" | "buffer" => (),
@@ -294,7 +291,7 @@ fn download(
         let threads: i64 = matches.value_of("threads").unwrap().parse().unwrap();
 
         if threads == 0 {
-            for shadertoy in shadertoys.iter() {
+            for shadertoy in &shadertoys {
                 let _r_ = process_shadertoy(shadertoy);
             }
         }
@@ -401,7 +398,7 @@ fn run() -> Result<()> {
 
     let mut built_shadertoy_shaders = download(&matches, &render_backend).chain_err(|| "query for shaders failed")?;
 
-    if built_shadertoy_shaders.len() == 0 {
+    if built_shadertoy_shaders.is_empty() {
         return Ok(());
     }
 
@@ -518,7 +515,7 @@ fn run() -> Result<()> {
                 
                 for index in 0..shadertoy_increment {
 
-                    if let Some(ref shadertoy) = built_shadertoy_shaders.get(start_index + index) {
+                    if let Some(shadertoy) = built_shadertoy_shaders.get(start_index + index) {
 
                         let grid_pos = (index % grid_size.0, index / grid_size.0 );
 
@@ -535,7 +532,7 @@ fn run() -> Result<()> {
                         });
                     }
                 }
-            } else if let Some(ref shadertoy) = built_shadertoy_shaders.get(shadertoy_index) {
+            } else if let Some(shadertoy) = built_shadertoy_shaders.get(shadertoy_index) {
 
                 quads.push(RenderQuad {
                     pos: (0.0, 0.0),
@@ -548,7 +545,7 @@ fn run() -> Result<()> {
 
             let active_shadertoy = built_shadertoy_shaders.get(shadertoy_index);
 
-            if draw_grid && built_shadertoy_shaders.len() > 0 {
+            if draw_grid && !built_shadertoy_shaders.is_empty() {
                 window.set_title(&format!("Shadertoy ({} / {})", 
                     shadertoy_index+1, 
                     built_shadertoy_shaders.len()));
