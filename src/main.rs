@@ -97,7 +97,6 @@ fn write_file<P: AsRef<Path>>(path: P, buf: &[u8]) -> Result<()> {
 
 fn search(client: &shadertoy::Client, matches: &clap::ArgMatches) -> Result<Vec<String>> {
 
-    //use shadertoy::SearchFilter::FromStr;
     use std::str::FromStr;
 
     // create search parameters
@@ -141,7 +140,6 @@ fn download(
     matches: &clap::ArgMatches, 
     render_backend: &Option<Box<RenderBackend>>) -> Result<Vec<BuiltShadertoy>> 
 {
-
     let time = Instant::now();
 
     let api_key = matches.value_of("apikey").unwrap();
@@ -150,7 +148,7 @@ fn download(
     let shadertoys = search(&client, matches)?;
 
     let shadertoys_len = shadertoys.len();
-    println!("found {} shadertoys", shadertoys_len);
+    println!("Search found {} shadertoys [{:.2} ms]", shadertoys_len, time.elapsed().as_fractional_millis());
 
     let built_shadertoys = Mutex::new(Vec::<BuiltShadertoy>::new());
 
@@ -316,7 +314,7 @@ fn download(
 
     let built_shadertoys = built_shadertoys.into_inner().unwrap();
 
-    println!("{} / {} shadertoys built successfully in {:.2} seconds", 
+    println!("Done, {} / {} shadertoys built successfully [{:.3} seconds]", 
         built_shadertoys.len(), 
         shadertoys_len,
         time.elapsed().as_fractional_secs());
