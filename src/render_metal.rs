@@ -13,6 +13,8 @@ use std::mem;
 use std::any::Any;
 
 use std::ffi::CStr;
+use std::cell::RefCell;
+use std::sync::Mutex;
 use objc::runtime::{Object, YES};
 use self::foreign_types::ForeignType;
 
@@ -44,7 +46,7 @@ pub struct MetalRenderBackend {
     time: Instant,
     time_last_frame: Instant,
 
-    pipelines: Vec<MetalRenderPipeline>,
+    pipelines: Mutex<RefCell<Vec<MetalRenderPipeline>>>,
 }
 
 impl MetalRenderBackend {
@@ -61,7 +63,7 @@ impl MetalRenderBackend {
             frame_index: 0,
             time: Instant::now(),
             time_last_frame: Instant::now(),
-            pipelines: vec![],
+            pipelines: Mutex::new(RefCell::new(vec![])),
         }
     }
 
@@ -197,7 +199,9 @@ impl RenderBackend for MetalRenderBackend {
                         }
                     };
 
-                    let pipeline = &self.pipelines[quad.pipeline_handle];
+                    let pipelines_lock = self.pipelines.lock().unwrap();
+                    let pipelines = pipelines_lock.borrow();
+                    let pipeline = &pipelines[quad.pipeline_handle];
                     let constants_ptr: *const ShadertoyConstants = &constants;
                     let constants_cptr = constants_ptr as *mut libc::c_void;
 
@@ -230,7 +234,7 @@ impl RenderBackend for MetalRenderBackend {
         }
     }
 
-    fn new_pipeline(&mut self, shader_source: &str) -> Result<RenderPipelineHandle> {
+    fn new_pipeline(&self, shader_source: &str) -> Result<RenderPipelineHandle> {
         let metal_source = convert_glsl_to_metal("unknown name", "main", shader_source)?;
 
         // save out the generated Metal file, for debugging
@@ -241,9 +245,11 @@ impl RenderBackend for MetalRenderBackend {
             pipeline_state: self.create_pipeline_state(&metal_source)?,
         };
 
-        self.pipelines.push(pipeline);
+        let pipelines_lock = self.pipelines.lock().unwrap();
+        let mut pipelines = pipelines_lock.borrow_mut();
+        pipelines.push(pipeline);
 
-        Ok(self.pipelines.len() - 1 as RenderPipelineHandle)
+        Ok(pipelines.len() - 1 as RenderPipelineHandle)
     }
 }
 
