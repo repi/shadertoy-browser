@@ -20,6 +20,9 @@ extern crate open;
 extern crate rust_base58 as base58;
 extern crate serde_json;
 extern crate colored;
+extern crate indicatif;
+#[macro_use]
+extern crate thread_profiler;
 extern crate reqwest;
 extern crate shadertoy;
 
@@ -27,14 +30,13 @@ use std::io::Write;
 use std::io::prelude::*;
 use std::fs::File;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
-use std::time::Instant;
+use std::time::{Instant};
 use floating_duration::{TimeAsFloat};
 use clap::{Arg, App};   
 use rayon::prelude::*;
 use base58::ToBase58;
-use colored::*;
+use indicatif::{ProgressBar, ProgressStyle};
 
 mod render;
 use render::*;
@@ -94,6 +96,8 @@ fn write_file<P: AsRef<Path>>(path: P, buf: &[u8]) -> Result<()> {
 
 fn search(client: &shadertoy::Client, matches: &clap::ArgMatches) -> Result<Vec<String>> {
 
+    profile_scope!("search");
+
     use std::str::FromStr;
 
     // create search parameters
@@ -133,27 +137,39 @@ fn search(client: &shadertoy::Client, matches: &clap::ArgMatches) -> Result<Vec<
     }
 }
 
+
 fn download(
     matches: &clap::ArgMatches, 
     render_backend: &Option<Box<RenderBackend>>) -> Result<Vec<BuiltShadertoy>> 
 {
+    profile_scope!("download");
+    
     let time = Instant::now();
 
     let api_key = matches.value_of("apikey").unwrap();
     let client = shadertoy::Client::new(api_key);
+    
+    let pb = ProgressBar::new_spinner();
+    pb.set_style(ProgressStyle::default_spinner().template("")); // workaround
+    pb.enable_steady_tick(200);
+    pb.tick(); // workaround for https://github.com/mitsuhiko/indicatif/issues/36
+    pb.set_style(ProgressStyle::default_spinner().template("{spinner:.green}  Searching{wide_msg}"));
 
     let shadertoys = search(&client, matches)?;
-
     let shadertoys_len = shadertoys.len();
-    println!("Search found {} shadertoys [{:.2} ms]", shadertoys_len, time.elapsed().as_fractional_millis());
+        
+    pb.finish_with_message(
+        &format!(": {} found [{:.2} s]", shadertoys_len, time.elapsed().as_fractional_secs()));
 
     let built_shadertoys = Mutex::new(Vec::<BuiltShadertoy>::new());
 
-    {
-        // closure for processing a shadertoy
-    
-        let index = AtomicUsize::new(0);
+    let pb = ProgressBar::new(shadertoys_len as u64);    
+    pb.set_style(ProgressStyle::default_bar()
+        .template("{spinner:.green} Processing [{bar:40.cyan/blue}] {pos}/{len} {eta}")
+        .progress_chars("##-"));
 
+    {
+        // closure for processing a shadertoy    
         let process_shadertoy = |shadertoy| -> Result<()> {
 
             let path = PathBuf::from(format!("output/shader/{}/{}.json", shadertoy, shadertoy));
@@ -161,14 +177,16 @@ fn download(
             let shader;
 
             if !path.exists() {
+                profile_scope!("shader_json_query");
                 shader = client.get_shader(shadertoy)?;
                 write_file(&path, serde_json::to_string_pretty(&shader)?.as_bytes())?;
             } else {
+                profile_scope!("shader_json_file_load");
                 let mut json_str = String::new();
                 File::open(&path)?.read_to_string(&mut json_str)?;
                 shader = serde_json::from_str(&json_str)?;
             }
-
+    /*
             println!("({} / {}) {} - {} by {} - {} views, {} likes", 
                 index.fetch_add(1, Ordering::SeqCst), 
                 shadertoys_len, 
@@ -177,6 +195,8 @@ fn download(
                 shader.info.username.blue(),
                 shader.info.viewed,
                 shader.info.likes);
+    */
+            //pb.set_message(&format!("\"{}\"", shader.info.name));
 
             for pass in &shader.renderpass {
 
@@ -216,7 +236,7 @@ fn download(
                     "sound" => sound_footer_source,
                     _ => image_footer_source,
                 };
- 
+
                 // add our header source first which includes shadertoy constant & resource definitions
                 let full_source = format!("{}\n{}\n{}\n{}", header_source, sampler_source, pass.code, footer_source);
 
@@ -237,6 +257,9 @@ fn download(
                     }
 
                     if let Some(ref rb) = *render_backend {
+
+                        profile_scope!("new_pipeline");
+
                         match rb.new_pipeline(&shader_path, full_source.as_str()) {
                             Ok(pipeline_handle) => {
                                 let mut bs = built_shadertoys.lock().unwrap();
@@ -277,12 +300,14 @@ fn download(
                         let mut data = vec![];
                         data_response.read_to_end(&mut data)?;
 
-                        println!("Asset downloaded: {}, {} bytes", input.src, data.len());
+                        //println!("Asset downloaded: {}, {} bytes", input.src, data.len());
 
                         write_file(&path, &data)?;
                     } 
                 }
             }
+
+            pb.inc(1);
 
             Ok(())
         };
@@ -298,22 +323,33 @@ fn download(
         else 
         {
             if threads > 1 {
-                if let Err(_err) = rayon::initialize(rayon::Configuration::new().num_threads(threads as usize)) {
-                    bail!("rayon initialization failed");
-                }
+                rayon::initialize(rayon::Configuration::new().num_threads(threads as usize)).unwrap();
             }
 
+            let init_threads: Mutex<Vec<std::thread::ThreadId>> = Mutex::new(vec![]);
+
             shadertoys.par_iter().for_each(|shadertoy| {
+
+                // TODO clean up & simplify this hacky way of naming the job worker threads
+                {
+                    let mut it = init_threads.lock().unwrap();
+                    if !it.contains(&std::thread::current().id()) {                        
+                        thread_profiler::register_thread_with_profiler(format!("job{}", it.len()));
+                        it.push(std::thread::current().id());
+                    }
+                }
+
                 let _r_ = process_shadertoy(shadertoy);
             });
         }
     }
 
+    pb.finish_and_clear();
+
     let built_shadertoys = built_shadertoys.into_inner().unwrap();
 
-    println!("Done, {} / {} shadertoys built successfully [{:.3} seconds]", 
+    println!("  Processing: {} built successfully [{:.2} s]", 
         built_shadertoys.len(), 
-        shadertoys_len,
         time.elapsed().as_fractional_secs());
 
     Ok(built_shadertoys)
@@ -396,7 +432,11 @@ fn run() -> Result<()> {
         render_backend = None;
     }
 
+    thread_profiler::register_thread_with_profiler(String::from("main"));
+
     let mut built_shadertoy_shaders = download(&matches, &render_backend).chain_err(|| "query for shaders failed")?;
+
+    thread_profiler::write_profile("profile-startup.json");
 
     if built_shadertoy_shaders.is_empty() {
         return Ok(());

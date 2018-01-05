@@ -91,13 +91,22 @@ impl MetalRenderBackend {
     }
 
     fn create_pipeline_state(&self, shader_source: &str) -> Result<metal::RenderPipelineState> {
+
+        profile_scope!("create_pipeline_state");
+
         let compile_options = metal::CompileOptions::new();
 
         let vs_source = include_str!("shadertoy_vs.metal");
         let ps_source = shader_source;
 
-        let vs_library = new_library_with_source(&self.device, vs_source, &compile_options)?;
-        let ps_library = new_library_with_source(&self.device, ps_source, &compile_options)?;
+        let vs_library;
+        let ps_library;
+
+        {
+            profile_scope!("new_library_with_source");
+            vs_library = new_library_with_source(&self.device, vs_source, &compile_options)?;
+            ps_library = new_library_with_source(&self.device, ps_source, &compile_options)?;
+        }
 
         let vs = vs_library.get_function("vsMain", None)?;
         let ps = ps_library.get_function("main0", None)?;
@@ -114,6 +123,7 @@ impl MetalRenderBackend {
             .unwrap()
             .set_pixel_format(metal::MTLPixelFormat::BGRA8Unorm);
 
+        profile_scope!("new_render_pipeline_state");
         new_render_pipeline_state(&self.device, &pipeline_desc)
     }
 }
@@ -366,6 +376,9 @@ fn new_render_pipeline_state(
 }
 
 fn convert_glsl_to_metal(name: &str, entry_point: &str, source: &str) -> Result<String> {
+
+    profile_scope!("convert_glsl_to_metal");
+
     // convert to SPIR-V using shaderc
 
     let mut compiler = shaderc::Compiler::new().unwrap();
@@ -390,6 +403,8 @@ fn convert_glsl_to_metal(name: &str, entry_point: &str, source: &str) -> Result<
     let mut ast = spirv::Ast::<msl::Target>::parse(&module).unwrap();
 
     //    ast.compile().chain_err(|| "spirv-cross compilation failed")?
+
+    profile_scope!("spirv_compile_to_metal");
 
     match ast.compile() {
         Ok(str) => Ok(str),

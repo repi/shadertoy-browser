@@ -34,6 +34,8 @@ colored = "1.6"
 reqwest = "0.8.2"
 error-chain = "0.11.0"
 open = "1.2.1"
+indicatif = "0.8.0"
+thread_profiler = "0.1.3"
 shadertoy = { path = "src/shadertoy", version = "0.4" }
 
 [target.'cfg(target_os = "macos")'.dependencies]
@@ -41,3 +43,10 @@ cocoa = "0.13.0"
 objc = "0.2.2"
 objc-foundation = "0.1.1"
 metal-rs = "0.6.1"
+
+[profile.release]
+debug = true
+
+[features]
+default = [ "profiler"]
+profiler = ["thread_profiler/thread_profiler"]
