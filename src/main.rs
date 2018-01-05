@@ -28,6 +28,7 @@ extern crate serde_json;
 extern crate colored;
 extern crate indicatif;
 extern crate fern;
+extern crate sha3;
 
 use std::io::Write;
 use std::io::prelude::*;
@@ -41,6 +42,7 @@ use rayon::prelude::*;
 use base58::ToBase58;
 use indicatif::{ProgressBar, ProgressStyle};
 use colored::*;
+use sha3::{Digest as Sha3Digest, Sha3_256};
 
 mod render;
 use render::*;
@@ -265,27 +267,45 @@ fn download(
 
                         let time = Instant::now();
 
-                        match rb.new_pipeline(&shader_path, full_source.as_str()) {
-                            Ok(pipeline_handle) => {
-                                info!("Built shadertoy pipeline for {} ({} by {}) in {:.1} ms", 
-                                    shader.info.id,
-                                    shader.info.name,
-                                    shader.info.username,
-                                    time.elapsed().as_fractional_millis());
+                        // calculate hash for the inputs for the pipeline and check if there
+                        // already is a failed result for that specific content identity then
+                        // do not try and build it again. this is a major speed up as not all
+                        // shadertoys are successfully built, and it is redundant to try and build
+                        // them without nay changes
+                        let source_hash = Sha3_256::digest(&full_source.as_bytes());
+                        let code_version = 1; // bump this if any of the code in new_pipeline is changed that could affect the success
+                        let error_path = PathBuf::from(&format!("output/pipeline_fail/{}/{}", code_version, source_hash.to_base58()));
 
-                                let mut bs = built_shadertoys.lock().unwrap();
-                                bs.push(BuiltShadertoy {
-                                    info: shader.info.clone(),
-                                    pipeline_handle,
-                                });
-                            },
-                            Err(err) => {
-                                error!("Failed building shader for shadertoy {} ({} by {}): {}", 
-                                    shader.info.id,
-                                    shader.info.name,
-                                    shader.info.username,
-                                    err);
-                            },
+                        if error_path.exists() {
+                            error!("Skipped building failing shader for shadertoy {} ({} by {})", 
+                                shader.info.id,
+                                shader.info.name,
+                                shader.info.username);
+                        } else {
+                            match rb.new_pipeline(&shader_path, full_source.as_str()) {
+                                Ok(pipeline_handle) => {
+                                    info!("Built shadertoy pipeline for {} ({} by {}) in {:.1} ms", 
+                                        shader.info.id,
+                                        shader.info.name,
+                                        shader.info.username,
+                                        time.elapsed().as_fractional_millis());
+
+                                    let mut bs = built_shadertoys.lock().unwrap();
+                                    bs.push(BuiltShadertoy {
+                                        info: shader.info.clone(),
+                                        pipeline_handle,
+                                    });
+                                },
+                                Err(err) => {
+                                    error!("Failed building shader for shadertoy {} ({} by {}): {}", 
+                                        shader.info.id,
+                                        shader.info.name,
+                                        shader.info.username,
+                                        err);
+                                    
+                                    write_file(error_path, format!("{}", err).as_bytes())?;
+                                },
+                            }
                         }
                     }
                 }
