@@ -12,3 +12,4 @@ Cargo.lock
 
 /output/
 profile-startup.json
+output.log

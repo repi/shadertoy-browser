@@ -11,7 +11,13 @@
 extern crate error_chain;
 #[macro_use]
 extern crate clap;
+#[macro_use]
+extern crate thread_profiler;
+#[macro_use]
+extern crate log;
 
+extern crate shadertoy;
+extern crate reqwest;
 extern crate floating_duration;
 extern crate chrono;
 extern crate rayon;
@@ -21,10 +27,7 @@ extern crate rust_base58 as base58;
 extern crate serde_json;
 extern crate colored;
 extern crate indicatif;
-#[macro_use]
-extern crate thread_profiler;
-extern crate reqwest;
-extern crate shadertoy;
+extern crate fern;
 
 use std::io::Write;
 use std::io::prelude::*;
@@ -68,6 +71,7 @@ mod errors {
             Json(::serde_json::error::Error);
             Clap(::clap::Error);
             Reqwest(::reqwest::Error);
+            Log(::log::SetLoggerError);
         }
     }            
 }
@@ -188,6 +192,13 @@ fn download(
                 shader = serde_json::from_str(&json_str)?;
             }
 
+            info!("Found shadertoy {}: {} by {} ({} views, {} likes)", 
+                shader.info.id,
+                shader.info.name, 
+                shader.info.username,
+                shader.info.viewed,
+                shader.info.likes);
+            
             //pb.set_message(&format!("\"{}\"", shader.info.name));
 
             for pass in &shader.renderpass {
@@ -252,21 +263,28 @@ fn download(
 
                         profile_scope!("new_pipeline");
 
+                        let time = Instant::now();
+
                         match rb.new_pipeline(&shader_path, full_source.as_str()) {
                             Ok(pipeline_handle) => {
+                                info!("Built shadertoy pipeline for {} ({} by {}) in {:.1} ms", 
+                                    shader.info.id,
+                                    shader.info.name,
+                                    shader.info.username,
+                                    time.elapsed().as_fractional_millis());
+
                                 let mut bs = built_shadertoys.lock().unwrap();
                                 bs.push(BuiltShadertoy {
                                     info: shader.info.clone(),
                                     pipeline_handle,
                                 });
                             },
-                            Err(_err) => {
-                            /*
-                                println!("Failed building shader for shadertoy {} ({} by {})", 
-                                    shadertoy.info.id.yellow(),
-                                    shadertoy.info.name.green(), 
-                                    shadertoy.info.username.blue());
-                            */
+                            Err(err) => {
+                                error!("Failed building shader for shadertoy {} ({} by {}): {}", 
+                                    shader.info.id,
+                                    shader.info.name,
+                                    shader.info.username,
+                                    err);
                             },
                         }
                     }
@@ -427,6 +445,30 @@ fn run() -> Result<()> {
                 .help("More verbose log output, including list of all shadertoys found"),
         )
         .get_matches();
+
+    // setup log 
+
+    fern::Dispatch::new()
+        .format(|out, message, record| {
+            out.finish(format_args!(
+                "{}[{}][{}] {}",
+                chrono::Local::now().format("[%Y-%m-%d][%H:%M:%S]"),
+                record.target(),
+                record.level(),
+                message
+            ))
+        })
+        // Add blanket level filter -
+        .level(log::LevelFilter::Debug)
+        // only output to log file
+        //.chain(fern::log_file("output.log").append(false)?)
+        .chain(std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .append(false)
+            .open("output.log")?)
+        .apply()?;
+
 
     if cfg!(target_os="windows") {
         // disable colored text output on Windows as the Windows terminals do not support it yet
