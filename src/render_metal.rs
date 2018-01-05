@@ -65,6 +65,7 @@ pub struct MetalRenderBackend {
     time: Instant,
     time_last_frame: Instant,
 
+    vs_function: metal::Function,
     pipelines: Mutex<RefCell<Vec<MetalRenderPipeline>>>,
 }
 
@@ -75,8 +76,15 @@ unsafe impl Sync for MetalRenderBackend {
 impl MetalRenderBackend {
     pub fn new() -> MetalRenderBackend {
         let device = metal::Device::system_default();
-
         let command_queue = device.new_command_queue();
+
+        // compile the vertex shader,
+        // which is the same for all shadertoys and thus shared
+
+        let compile_options = metal::CompileOptions::new();
+        let vs_source = include_str!("shadertoy_vs.metal");
+        let vs_library = new_library_with_source(&device, vs_source, &compile_options).unwrap();
+        let vs_function = vs_library.get_function("vsMain", None).unwrap();
 
         MetalRenderBackend {
             device,
@@ -86,6 +94,7 @@ impl MetalRenderBackend {
             frame_index: 0,
             time: Instant::now(),
             time_last_frame: Instant::now(),
+            vs_function: vs_function,
             pipelines: Mutex::new(RefCell::new(vec![])),
         }
     }
@@ -96,26 +105,18 @@ impl MetalRenderBackend {
 
         let compile_options = metal::CompileOptions::new();
 
-        let vs_source = include_str!("shadertoy_vs.metal");
-        let ps_source = shader_source;
-
-        let vs_library;
-        let ps_library;
-
-        {
+        let ps_library = {
             profile_scope!("new_library_with_source");
-            vs_library = new_library_with_source(&self.device, vs_source, &compile_options)?;
-            ps_library = new_library_with_source(&self.device, ps_source, &compile_options)?;
-        }
+            new_library_with_source(&self.device, shader_source, &compile_options)?
+        };
 
-        let vs = vs_library.get_function("vsMain", None)?;
-        let ps = ps_library.get_function("main0", None)?;
+        let ps_function = ps_library.get_function("main0", None)?;
 
         let vertex_desc = metal::VertexDescriptor::new();
 
         let pipeline_desc = metal::RenderPipelineDescriptor::new();
-        pipeline_desc.set_vertex_function(Some(&vs));
-        pipeline_desc.set_fragment_function(Some(&ps));
+        pipeline_desc.set_vertex_function(Some(&self.vs_function));
+        pipeline_desc.set_fragment_function(Some(&ps_function));
         pipeline_desc.set_vertex_descriptor(Some(vertex_desc));
         pipeline_desc
             .color_attachments()
