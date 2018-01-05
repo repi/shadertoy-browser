@@ -310,7 +310,7 @@ fn download(
                         let mut data = vec![];
                         data_response.read_to_end(&mut data)?;
 
-                        //println!("Asset downloaded: {}, {} bytes", input.src, data.len());
+                        info!("Asset downloaded: {}, {} bytes", input.src, data.len());
 
                         write_file(&path, &data)?;
                     } 
