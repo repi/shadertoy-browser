@@ -61,6 +61,21 @@ OPTIONS:
 
 To use the Rust shadertoy API directly in another app or library, check out the [`shadertoy`](https://crates.io/crates/shadertoy) crate, [docs](http://docs.rs/shadertoy) and [README](src/shadertoy/README.MD).
 
+## Todo
+
+This repo and app is a bit of an experimental Rust test range, and it is not intended to support everything or all shadertoys. But here are a couple of things I would like to implement going forward:
+
+- [ ] Rendering on Windows using DX12 and DXC
+- [ ] Rendering backend using SPIRV
+- [ ] Be able to click to select a shadertoy in grid view
+- [ ] Basic IMGUI for interactive searching & filtering
+- [ ] Async future based version of the Shadertoy client REST API
+- [ ] Async background download and building of shadertoys
+- [ ] Proper key-value cache store instead of files
+- [ ] Support shadertoys that use textures & buffers
+- [ ] Support shadertoys that use multiple passes
+- [ ] Support shadertoys that use keyboard input
+
 ## License
 
 Licensed under either of the following, at your option:
