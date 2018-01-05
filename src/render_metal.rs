@@ -103,10 +103,9 @@ impl MetalRenderBackend {
 
         profile_scope!("create_pipeline_state");
 
-        let compile_options = metal::CompileOptions::new();
-
         let ps_library = {
             profile_scope!("new_library_with_source");
+            let compile_options = metal::CompileOptions::new();
             new_library_with_source(&self.device, shader_source, &compile_options)?
         };
 
