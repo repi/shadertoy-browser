@@ -364,7 +364,7 @@ fn download(
                 {
                     let mut it = init_threads.lock().unwrap();
                     if !it.contains(&std::thread::current().id()) {                        
-                        thread_profiler::register_thread_with_profiler(format!("job{}", it.len()));
+                        thread_profiler::register_thread_with_profiler();
                         it.push(std::thread::current().id());
                     }
                 }
@@ -509,11 +509,16 @@ fn run() -> Result<()> {
         render_backend = None;
     }
 
-    thread_profiler::register_thread_with_profiler(String::from("main"));
+    thread_profiler::register_thread_with_profiler();
 
     let mut built_shadertoy_shaders = download(&matches, &render_backend).chain_err(|| "query for shaders failed")?;
 
-    thread_profiler::write_profile("profile-startup.json");
+    {
+        let time = Instant::now();
+        let file_name = "profile-startup.json";
+        thread_profiler::write_profile(file_name);
+        info!("Saved profiler log to \"{}\" [{:.1} ms]", file_name, time.elapsed().as_fractional_millis());
+    }
 
     if built_shadertoy_shaders.is_empty() {
         return Ok(());
