@@ -2,6 +2,7 @@ use std::any::Any;
 
 use errors::*;
 
+#[repr(C)]
 #[allow(non_snake_case)]
 pub struct ShadertoyConstants {
     // The viewport resolution (z is pixel aspect ratio, usually 1.0).
