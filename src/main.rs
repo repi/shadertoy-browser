@@ -478,10 +478,6 @@ fn run() -> Result<()> {
                 message
             ))
         })
-        // Add blanket level filter -
-        .level(log::LevelFilter::Debug)
-        // only output to log file
-        //.chain(fern::log_file("output.log").append(false)?)
         .chain(std::fs::OpenOptions::new()
             .write(true)
             .create(true)
@@ -511,8 +507,11 @@ fn run() -> Result<()> {
 
     thread_profiler::register_thread_with_profiler();
 
+    // download and process assets
+
     let mut built_shadertoy_shaders = download(&matches, &render_backend).chain_err(|| "query for shaders failed")?;
 
+    // write out profiler data for startup
     {
         let time = Instant::now();
         let file_name = "profile-startup.json";
@@ -520,179 +519,184 @@ fn run() -> Result<()> {
         info!("Saved profiler log to \"{}\" [{:.1} ms]", file_name, time.elapsed().as_fractional_millis());
     }
 
-    if built_shadertoy_shaders.is_empty() {
+    if built_shadertoy_shaders.is_empty() || matches.is_present("headless") {
         return Ok(());
     }
 
     let mut render_backend = render_backend.chain_err(|| "skipping rendering, as have no renderer available")?;
 
-    if !matches.is_present("headless") {
 
-        let mut events_loop = winit::EventsLoop::new();
-        let window = winit::WindowBuilder::new()
-            .with_dimensions(1024, 768)
-            .with_title("Shadertoy Browser".to_string())
-            .build(&events_loop)
-            .chain_err(|| "error creating window")?;
+    // set up rendering window
 
-        render_backend.init_window(&window);
+    let mut events_loop = winit::EventsLoop::new();
+    let window = winit::WindowBuilder::new()
+        .with_dimensions(1024, 768)
+        .with_title("Shadertoy Browser".to_string())
+        .build(&events_loop)
+        .chain_err(|| "error creating window")?;
+
+    render_backend.init_window(&window);
 
 
-        #[cfg(target_os="macos")]
-        let mut pool = unsafe { NSAutoreleasePool::new(cocoa::base::nil) };
+    #[cfg(target_os="macos")]
+    let mut pool = unsafe { NSAutoreleasePool::new(cocoa::base::nil) };
 
-        let mut running = true;
+    let mut running = true;
 
-        let mut mouse_pos = (0.0f64, 0.0f64);
-        let mut mouse_pressed_pos = (0.0f64, 0.0f64);
-        let mut mouse_click_pos = (0.0f64, 0.0f64);
-        let mut mouse_lmb_pressed = false;
+    let mut mouse_pos = (0.0f64, 0.0f64);
+    let mut mouse_pressed_pos = (0.0f64, 0.0f64);
+    let mut mouse_click_pos = (0.0f64, 0.0f64);
+    let mut mouse_lmb_pressed = false;
+    
+    let mut shadertoy_index = 0usize;
+    let mut draw_grid = true;
+    let grid_size = (4, 4);
+    
+    // frame loop
+
+    while running {
+
+        let shadertoy_increment = if draw_grid {
+            grid_size.0 * grid_size.1
+        } else {
+            1
+        };
+
+        // handle window events
+
+        events_loop.poll_events(|event| match event {
+            winit::Event::WindowEvent { event: winit::WindowEvent::Closed, .. } => running = false,
+            winit::Event::WindowEvent { event: winit::WindowEvent::CursorMoved { position, .. }, .. } => {
+                mouse_pos = position;
+                if mouse_lmb_pressed {
+                    mouse_pressed_pos = position;
+                }
+            }
+            winit::Event::WindowEvent { event: winit::WindowEvent::MouseInput { state, button, .. }, .. } => {
+                if state == winit::ElementState::Pressed {
+                    if button == winit::MouseButton::Left {
+                        if !mouse_lmb_pressed {
+                            mouse_click_pos = mouse_pos;
+                        }
+                        mouse_lmb_pressed = true;
+                    }
+                }
+                else {
+                    mouse_pressed_pos = (0.0, 0.0);
+                    mouse_click_pos = (0.0, 0.0);
+                    mouse_lmb_pressed = false;
+                }
+            }
+            winit::Event::WindowEvent { event: winit::WindowEvent::KeyboardInput { input, .. }, .. } => {
+                if input.state == winit::ElementState::Pressed {
+                    match input.virtual_keycode {
+                        Some(winit::VirtualKeyCode::Left) => {
+                            shadertoy_index = shadertoy_index.saturating_sub(shadertoy_increment);
+                        }
+                        Some(winit::VirtualKeyCode::Right) => {
+                            if shadertoy_index + shadertoy_increment < built_shadertoy_shaders.len() {
+                                shadertoy_index += shadertoy_increment;
+                            }
+                        }
+                        Some(winit::VirtualKeyCode::Space) => {
+                            draw_grid = !draw_grid;
+                        }
+                        Some(winit::VirtualKeyCode::Return) => {
+                            if let Some(ref shadertoy) = built_shadertoy_shaders.get_mut(shadertoy_index) {
+                                let _r_ = open::that(format!("https://www.shadertoy.com/view/{}", shadertoy.info.id));
+                            }
+                        }
+                        // this panics on Mac as "not yet implemented"
+                    /*
+                        Some(winit::VirtualKeyCode::F) => {
+                            window.set_fullscreen(None);
+                        }
+                    */
+                        // manual workaround for CMD-Q on Mac not quitting the app
+                        // issue tracked in https://github.com/tomaka/winit/issues/41
+                        Some(winit::VirtualKeyCode::Q) => {
+                            if cfg!(target_os = "macos") && input.modifiers.logo {
+                                running = false;
+                            }
+                        }
+                        _ => (),
+                    }
+                }
+            }
+            winit::Event::WindowEvent { event: winit::WindowEvent::Resized { .. }, .. } => {
+                render_backend.init_window(&window);        
+            }
+            _ => (),
+        });
         
 
-        let mut shadertoy_index = 0usize;
-        let mut draw_grid = true;
-        let grid_size = (4, 4);
-        
-        while running {
+        // render frame
 
-            let shadertoy_increment = if draw_grid {
-                grid_size.0 * grid_size.1
-            } else {
-                1
-            };
+        let mut quads: Vec<RenderQuad> = vec![];
 
-            events_loop.poll_events(|event| match event {
-                winit::Event::WindowEvent { event: winit::WindowEvent::Closed, .. } => running = false,
-                winit::Event::WindowEvent { event: winit::WindowEvent::CursorMoved { position, .. }, .. } => {
-                    mouse_pos = position;
-                    if mouse_lmb_pressed {
-                        mouse_pressed_pos = position;
-                    }
-                }
-                winit::Event::WindowEvent { event: winit::WindowEvent::MouseInput { state, button, .. }, .. } => {
-                    if state == winit::ElementState::Pressed {
-                        if button == winit::MouseButton::Left {
-                            if !mouse_lmb_pressed {
-                                mouse_click_pos = mouse_pos;
-                            }
-                            mouse_lmb_pressed = true;
-                        }
-                    }
-                    else {
-                        mouse_pressed_pos = (0.0, 0.0);
-                        mouse_click_pos = (0.0, 0.0);
-                        mouse_lmb_pressed = false;
-                    }
-                }
-                winit::Event::WindowEvent { event: winit::WindowEvent::KeyboardInput { input, .. }, .. } => {
-                    if input.state == winit::ElementState::Pressed {
-                        match input.virtual_keycode {
-                            Some(winit::VirtualKeyCode::Left) => {
-                                shadertoy_index = shadertoy_index.saturating_sub(shadertoy_increment);
-                            }
-                            Some(winit::VirtualKeyCode::Right) => {
-                                if shadertoy_index + shadertoy_increment < built_shadertoy_shaders.len() {
-                                    shadertoy_index += shadertoy_increment;
-                                }
-                            }
-                            Some(winit::VirtualKeyCode::Space) => {
-                                draw_grid = !draw_grid;
-                            }
-                            Some(winit::VirtualKeyCode::Return) => {
-                                if let Some(ref shadertoy) = built_shadertoy_shaders.get_mut(shadertoy_index) {
-                                    let _r_ = open::that(format!("https://www.shadertoy.com/view/{}", shadertoy.info.id));
-                                }
-                            }
-                            // this panics on Mac as "not yet implemented"
-                        /*
-                            Some(winit::VirtualKeyCode::F) => {
-                                window.set_fullscreen(None);
-                            }
-                        */
-                            // manual workaround for CMD-Q on Mac not quitting the app
-                            // issue tracked in https://github.com/tomaka/winit/issues/41
-                            Some(winit::VirtualKeyCode::Q) => {
-                                if cfg!(target_os = "macos") && input.modifiers.logo {
-                                    running = false;
-                                }
-                            }
-                            _ => (),
-                        }
-                    }
-                }
-                winit::Event::WindowEvent { event: winit::WindowEvent::Resized { .. }, .. } => {
-                    render_backend.init_window(&window);        
-                }
-                _ => (),
-            });
+        if draw_grid {
+
+            let start_index = shadertoy_index / shadertoy_increment * shadertoy_increment;
             
+            for index in 0..shadertoy_increment {
 
-            // render frame
+                if let Some(shadertoy) = built_shadertoy_shaders.get(start_index + index) {
 
-            let mut quads: Vec<RenderQuad> = vec![];
+                    let grid_pos = (index % grid_size.0, index / grid_size.0 );
 
-            if draw_grid {
-
-                let start_index = shadertoy_index / shadertoy_increment * shadertoy_increment;
-                
-                for index in 0..shadertoy_increment {
-
-                    if let Some(shadertoy) = built_shadertoy_shaders.get(start_index + index) {
-
-                        let grid_pos = (index % grid_size.0, index / grid_size.0 );
-
-                        quads.push(RenderQuad {
-                            pos: (
-                                (grid_pos.0 as f32) / (grid_size.0 as f32), 
-                                (grid_pos.1 as f32) / (grid_size.1 as f32)
-                            ),
-                            size: (
-                                1.0 / (grid_size.0 as f32), 
-                                1.0 / (grid_size.1 as f32)
-                            ),
-                            pipeline_handle: shadertoy.pipeline_handle,
-                        });
-                    }
+                    quads.push(RenderQuad {
+                        pos: (
+                            (grid_pos.0 as f32) / (grid_size.0 as f32), 
+                            (grid_pos.1 as f32) / (grid_size.1 as f32)
+                        ),
+                        size: (
+                            1.0 / (grid_size.0 as f32), 
+                            1.0 / (grid_size.1 as f32)
+                        ),
+                        pipeline_handle: shadertoy.pipeline_handle,
+                    });
                 }
-            } else if let Some(shadertoy) = built_shadertoy_shaders.get(shadertoy_index) {
-
-                quads.push(RenderQuad {
-                    pos: (0.0, 0.0),
-                    size: (1.0, 1.0),
-                    pipeline_handle: shadertoy.pipeline_handle,
-                });
             }
+        } else if let Some(shadertoy) = built_shadertoy_shaders.get(shadertoy_index) {
 
-            // update window title
-
-            let active_shadertoy = built_shadertoy_shaders.get(shadertoy_index);
-
-            if draw_grid && !built_shadertoy_shaders.is_empty() {
-                window.set_title(&format!("Shadertoy ({} / {})", 
-                    shadertoy_index+1, 
-                    built_shadertoy_shaders.len()));
-            } else if active_shadertoy.is_some() {
-                window.set_title(&format!("Shadertoy ({} / {}) - {} by {}", 
-                    shadertoy_index+1, 
-                    built_shadertoy_shaders.len(), 
-                    active_shadertoy.unwrap().info.name, 
-                    active_shadertoy.unwrap().info.username));
-            } else {
-                window.set_title("Shadertoy Browser");
-            }            
-
-            render_backend.render_frame(RenderParams {
-                clear_color: (0.0, 0.0, 0.0, 0.0),
-                mouse_pos: mouse_pressed_pos,
-                mouse_click_pos,
-                quads: &quads
+            quads.push(RenderQuad {
+                pos: (0.0, 0.0),
+                size: (1.0, 1.0),
+                pipeline_handle: shadertoy.pipeline_handle,
             });
+        }
 
-            #[cfg(target_os = "macos")]
-            unsafe {
-                msg_send![pool, release];
-                pool = NSAutoreleasePool::new(cocoa::base::nil);
-            }
+        // update window title
+
+        let active_shadertoy = built_shadertoy_shaders.get(shadertoy_index);
+
+        if draw_grid && !built_shadertoy_shaders.is_empty() {
+            window.set_title(&format!("Shadertoy ({} / {})", 
+                shadertoy_index+1, 
+                built_shadertoy_shaders.len()));
+        } else if active_shadertoy.is_some() {
+            window.set_title(&format!("Shadertoy ({} / {}) - {} by {}", 
+                shadertoy_index+1, 
+                built_shadertoy_shaders.len(), 
+                active_shadertoy.unwrap().info.name, 
+                active_shadertoy.unwrap().info.username));
+        } else {
+            window.set_title("Shadertoy Browser");
+        }            
+
+        // render and present the frame
+
+        render_backend.render_frame(RenderParams {
+            clear_color: (0.0, 0.0, 0.0, 0.0),
+            mouse_pos: mouse_pressed_pos,
+            mouse_click_pos,
+            quads: &quads
+        });
+
+        #[cfg(target_os = "macos")]
+        unsafe {
+            msg_send![pool, release];
+            pool = NSAutoreleasePool::new(cocoa::base::nil);
         }
     }
 

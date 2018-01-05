@@ -1,10 +1,9 @@
+extern crate metal_rs as metal;
 extern crate foreign_types;
 extern crate libc;
-extern crate metal_rs as metal;
 extern crate shaderc;
 extern crate spirv_cross;
 extern crate winit;
-
 extern crate cocoa;
 extern crate objc_foundation;
 
@@ -26,27 +25,14 @@ use winit::os::macos::WindowExt;
 use floating_duration::TimeAsFloat;
 use chrono::prelude::*;
 
-use render::*;
-use errors::*;
-
 use std;
 use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::io::Write;
 use std::io::prelude::*;
 
-fn write_file<P: AsRef<Path>>(path: P, buf: &[u8]) -> Result<()> {
-
-    if let Some(parent_path) = path.as_ref().parent() {
-        std::fs::create_dir_all(parent_path)?;
-    } 
-    
-    let mut file = File::create(&path)?;
-    file.write_all(buf)?;
-    Ok(())
-}
-
-
+use render::*;
+use errors::*;
 
 struct MetalRenderPipeline {
     pipeline_state: metal::RenderPipelineState,
@@ -156,8 +142,6 @@ impl MetalRenderBackend {
             }
         };
 
-        profile_scope!("apa");
-
         let ps_function = ps_library.get_function("main0", None)?;
 
         let vertex_desc = metal::VertexDescriptor::new();
@@ -204,7 +188,6 @@ impl RenderBackend for MetalRenderBackend {
     }
 
     fn render_frame(&mut self, params: RenderParams) {
-        //println!("frame: {}", self.frame_index);
 
         if let Some(ref layer) = self.layer {
             if let Some(drawable) = layer.next_drawable() {
@@ -445,11 +428,9 @@ fn convert_glsl_to_metal(name: &str, entry_point: &str, source: &str) -> Result<
 
     // convert SPIR-V to MSL
 
-    use self::spirv_cross::{msl, spirv};
+    let module = spirv_cross::spirv::Module::from_words(binary_result.as_binary());
 
-    let module = spirv::Module::from_words(binary_result.as_binary());
-
-    let mut ast = spirv::Ast::<msl::Target>::parse(&module).unwrap();
+    let mut ast = spirv_cross::spirv::Ast::<spirv_cross::msl::Target>::parse(&module).unwrap();
 
     //    ast.compile().chain_err(|| "spirv-cross compilation failed")?
 
@@ -462,4 +443,15 @@ fn convert_glsl_to_metal(name: &str, entry_point: &str, source: &str) -> Result<
             spirv_cross::ErrorCode::CompilationError(str) => Err(format!("spirv-cross error: {}", str).into()),
         },
     }
+}
+
+fn write_file<P: AsRef<Path>>(path: P, buf: &[u8]) -> Result<()> {
+
+    if let Some(parent_path) = path.as_ref().parent() {
+        std::fs::create_dir_all(parent_path)?;
+    } 
+    
+    let mut file = File::create(&path)?;
+    file.write_all(buf)?;
+    Ok(())
 }
