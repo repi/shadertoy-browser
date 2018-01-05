@@ -99,15 +99,64 @@ impl MetalRenderBackend {
         }
     }
 
-    fn create_pipeline_state(&self, shader_source: &str) -> Result<metal::RenderPipelineState> {
+    fn create_pipeline_state(&self, shader_path: &str, shader_source: &str) -> Result<metal::RenderPipelineState> {
 
         profile_scope!("create_pipeline_state");
 
         let ps_library = {
-            profile_scope!("new_library_with_source");
-            let compile_options = metal::CompileOptions::new();
-            new_library_with_source(&self.device, shader_source, &compile_options)?
+            profile_scope!("library_test");
+
+            if false {
+
+                let metal_path = format!("{}.metal", shader_path);
+                let air_path = format!("{}.air", shader_path);
+                let lib_path = format!("{}.metallib_v4", shader_path);
+
+                if !PathBuf::from(&lib_path).exists() {
+            
+                    // xcrun -sdk macosx metal MyLibrary.metal -o MyLibrary.air
+                    // xcrun -sdk macosx metallib MyLibrary.air -o MyLibrary.metallib
+
+                    info!("Spawning Metal compiler for {}", shader_path);
+
+                    let mut p = {
+                        profile_scope!("metal_compile");
+                        std::process::Command::new("xcrun")
+                            .args(&["-sdk", "macosx", "metal", &metal_path, "-o", &air_path])
+                            .stderr(std::process::Stdio::piped())
+                            .output()?
+                    };
+
+                    if !p.status.success() {
+                        return Err(format!("Metal shader compiler failed: {}", String::from_utf8_lossy(&p.stderr)).into());
+                    }
+                
+                    let mut p = {
+                        profile_scope!("metallib_compile");
+                        std::process::Command::new("xcrun")
+                            .args(&["-sdk", "macosx", "metallib", &air_path, "-o", &lib_path])
+                            .stderr(std::process::Stdio::piped())
+                            .output()?
+                    };
+
+                    if !p.status.success() {
+                        return Err(format!("Metal library compiler failed: {}", String::from_utf8_lossy(&p.stderr)).into());
+                    }
+                } else {
+                    info!("Metal library cached for {}", shader_path);                    
+                }
+
+                profile_scope!("new_library_with_file");
+                self.device.new_library_with_file(lib_path)?
+
+            } else {
+                profile_scope!("new_library_with_source");
+                let compile_options = metal::CompileOptions::new();
+                new_library_with_source(&self.device, shader_source, &compile_options)?
+            }
         };
+
+        profile_scope!("apa");
 
         let ps_function = ps_library.get_function("main0", None)?;
 
@@ -284,7 +333,7 @@ impl RenderBackend for MetalRenderBackend {
         }
 
         let pipeline = MetalRenderPipeline {
-            pipeline_state: self.create_pipeline_state(&metal_source)?,
+            pipeline_state: self.create_pipeline_state(&shader_path, &metal_source)?,
         };
 
         let pipelines_lock = self.pipelines.lock().unwrap();
