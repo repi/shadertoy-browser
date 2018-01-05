@@ -47,6 +47,7 @@ FLAGS:
         --help        Prints help information
     -h, --headless    Don't render, only download shadertoys
     -V, --version     Prints version information
+    -v, --verbose     More verbose log output, including list of all shadertoys found
 
 OPTIONS:
     -k, --apikey <key>          Set shadertoy API key to use. Create your key on https://www.shadertoy.com/myapps

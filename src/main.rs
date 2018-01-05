@@ -37,6 +37,7 @@ use clap::{Arg, App};
 use rayon::prelude::*;
 use base58::ToBase58;
 use indicatif::{ProgressBar, ProgressStyle};
+use colored::*;
 
 mod render;
 use render::*;
@@ -186,16 +187,7 @@ fn download(
                 File::open(&path)?.read_to_string(&mut json_str)?;
                 shader = serde_json::from_str(&json_str)?;
             }
-    /*
-            println!("({} / {}) {} - {} by {} - {} views, {} likes", 
-                index.fetch_add(1, Ordering::SeqCst), 
-                shadertoys_len, 
-                shadertoy.yellow(),
-                shader.info.name.green(), 
-                shader.info.username.blue(),
-                shader.info.viewed,
-                shader.info.likes);
-    */
+
             //pb.set_message(&format!("\"{}\"", shader.info.name));
 
             for pass in &shader.renderpass {
@@ -352,6 +344,23 @@ fn download(
         built_shadertoys.len(), 
         time.elapsed().as_fractional_secs());
 
+
+    if matches.is_present("verbose") {   
+        for shadertoy in &built_shadertoys {
+            println!("{}: {} by {} ({} views, {} likes)", 
+                shadertoy.info.id,
+                shadertoy.info.name.green(), 
+                shadertoy.info.username.blue(),
+                shadertoy.info.viewed,
+                shadertoy.info.likes);
+        }
+        println!("{} / {} shadertoys built successfully [{:.2} s]",
+            built_shadertoys.len(), 
+            shadertoys.len(),
+            time.elapsed().as_fractional_secs());
+    }
+
+
     Ok(built_shadertoys)
 }
 
@@ -410,6 +419,12 @@ fn run() -> Result<()> {
                 .short("h")
                 .long("headless")
                 .help("Don't render, only download shadertoys"),
+        )
+        .arg(
+            Arg::with_name("verbose")
+                .short("v")
+                .long("verbose")
+                .help("More verbose log output, including list of all shadertoys found"),
         )
         .get_matches();
 
