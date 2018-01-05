@@ -13,7 +13,7 @@ In `Cargo.toml`:
 
 ```toml
 [dependencies]
-shadertoy = "0.4"
+shadertoy = "0.5"
 ```
 
 Example usage:
