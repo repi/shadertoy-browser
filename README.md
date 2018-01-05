@@ -10,8 +10,8 @@ This application uses the [Shadertoy REST API](http://shadertoy.com/api) to sear
 
 The API queries are done through the [`shadertoy`](https://crates.io/crates/shadertoy) crate, which is also part of this repository in [`src/shadertoy`](src/shadertoy)
 
-![Render](https://raw.githubusercontent.com/repi/shadertoy-browser/master/screenshots/render.jpg?token=ABNEZJ60PVG0ncu_xnMImD4OMbP0Wc1vks5aVspLwA%3D%3D)
-![Output](https://raw.githubusercontent.com/repi/shadertoy-browser/master/screenshots/output.jpg?token=ABNEZOX6bEUtIh8T5W82SeuXlcWBcNUNks5aVsrcwA%3D%3D)
+![Render](https://raw.githubusercontent.com/repi/shadertoy-browser/master/screenshots/render.jpg?token=ABNEZC2kS8a8LqdI5bfJVYkojB7RNz83ks5aWQlAwA%3D%3D)
+![Output](https://raw.githubusercontent.com/repi/shadertoy-browser/master/screenshots/output.jpg?token=ABNEZDsvhrXMegCZ4Zy6IaWT4gNDsojOks5aWQkcwA%3D%3D)
 
 ## Building
 
