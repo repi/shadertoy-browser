@@ -272,7 +272,7 @@ fn download(
                         // do not try and build it again. this is a major speed up as not all
                         // shadertoys are successfully built, and it is redundant to try and build
                         // them without nay changes
-                        let source_hash = Sha3_256::digest(&full_source.as_bytes());
+                        let source_hash = Sha3_256::digest(full_source.as_bytes());
                         let code_version = 1; // bump this if any of the code in new_pipeline is changed that could affect the success
                         let error_path = PathBuf::from(&format!("output/pipeline_fail/{}/{}", code_version, source_hash.to_base58()));
 
