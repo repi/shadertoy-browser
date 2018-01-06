@@ -105,7 +105,7 @@ impl MetalRenderBackend {
 
                     info!("Spawning Metal compiler for {}", shader_path);
 
-                    let mut p = {
+                    let p = {
                         profile_scope!("metal_compile");
                         std::process::Command::new("xcrun")
                             .args(&["-sdk", "macosx", "metal", &metal_path, "-o", &air_path])
@@ -117,7 +117,7 @@ impl MetalRenderBackend {
                         return Err(format!("Metal shader compiler failed: {}", String::from_utf8_lossy(&p.stderr)).into());
                     }
                 
-                    let mut p = {
+                    let p = {
                         profile_scope!("metallib_compile");
                         std::process::Command::new("xcrun")
                             .args(&["-sdk", "macosx", "metallib", &air_path, "-o", &lib_path])
