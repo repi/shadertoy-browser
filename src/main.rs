@@ -423,7 +423,8 @@ fn run() -> Result<()> {
                 .long("search")
                 .value_name("string")
                 .help("Search string to filter which shadertoys to get")
-                .takes_value(true),
+                .takes_value(true)
+                .case_insensitive(true),
         )
         .arg(
             Arg::with_name("filter")
