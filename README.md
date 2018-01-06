@@ -1,14 +1,15 @@
 # Rusty Shadertoy Browser
 
 [![Crate](https://img.shields.io/crates/v/shadertoy-browser.svg)](https://crates.io/crates/shadertoy-browser)
-[![Build Status](https://travis-ci.com/repi/shadertoy-browser.svg?token=8SzG1tHkq3FpBRftmohU&branch=master)](https://travis-ci.com/repi/shadertoy-browser)
+[![Build Status](https://travis-ci.org/repi/shadertoy-browser.svg?branch=master)](https://travis-ci.org/repi/shadertoy-browser)
+[![Build Status](https://ci.appveyor.com/api/projects/status/ayr854h0a0eqqrfh/branch/master?svg=true)](https://ci.appveyor.com/project/repi/shadertoy-browser)
 ![MIT/Apache](https://img.shields.io/badge/license-MIT%2FApache-blue.svg)
 
 Small [Shadertoy](http://shadertoy.com) browser & viewer for Mac built in [Rust](https://www.rust-lang.org).
 
-Warning: Some of the Shadertoy shaders are extremely demanding of your GPU and cause system to be unresponsive.
-
 This application uses the [Shadertoy REST API](http://shadertoy.com/api) to search for Shadertoys and then downloads them locally and converts them using [`shaderc-rs`](https://crates.io/crates/shaderc) and [`spirv-cross`](https://crates.io/crates/spirv_cross) to be natively rendered on Mac using [`metal-rs`](https://crates.io/crates/metal-rs).
+
+Warning: Some of the Shadertoy shaders are extremely demanding of your GPU and cause system to be unresponsive.
 
 The API queries are done through the [`shadertoy`](https://crates.io/crates/shadertoy) crate, which is also part of this repository in [`src/shadertoy`](src/shadertoy)
 

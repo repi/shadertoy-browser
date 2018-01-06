@@ -12,6 +12,7 @@ workspace = "../.."
 
 [badges]
 travis-ci = { repository = "repi/shadertoy-browser" }
+appveyor = { repository = "repi/shadertoy-browser" }
 
 [dependencies]
 reqwest = "0.8.2"

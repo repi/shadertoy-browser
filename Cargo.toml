@@ -11,6 +11,7 @@ categories = ["rendering"]
 
 [badges]
 travis-ci = { repository = "repi/shadertoy-browser" }
+appveyor = { repository = "repi/shadertoy-browser" }
 
 [workspace]
 members = [
