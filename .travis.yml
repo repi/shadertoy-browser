@@ -8,4 +8,4 @@ os:
   - osx
 script:
   - cargo test --verbose --all
-  - cargo run -- --search car --headless
+  - cargo run -- --search car --headless --verbose
