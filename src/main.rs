@@ -162,11 +162,18 @@ fn download(
     pb.tick(); // workaround for https://github.com/mitsuhiko/indicatif/issues/36
     pb.set_style(ProgressStyle::default_spinner().template("{spinner:.green}  Searching{wide_msg}"));
 
-    let shadertoys = search(&client, matches)?;
-    let shadertoys_len = shadertoys.len();
-        
+    let shadertoys_found = search(&client, matches)?;
+    let shadertoys_found_len = shadertoys_found.len();
+    let shadertoys_dl_len: i64 = matches.value_of("limit").unwrap().parse().unwrap();
+    let shadertoys_len = if shadertoys_dl_len == -1 {
+        shadertoys_found_len
+    } else {
+        shadertoys_dl_len as usize
+    };
+    let shadertoys = &shadertoys_found[0..shadertoys_len];
+    
     pb.finish_with_message(
-        &format!(": {} found [{:.2} s]", shadertoys_len, time.elapsed().as_fractional_secs()));
+        &format!(": {} found, {} will download [{:.2} s]", shadertoys_found_len, shadertoys_len, time.elapsed().as_fractional_secs()));
 
     let built_shadertoys = Mutex::new(Vec::<BuiltShadertoy>::new());
 
@@ -346,7 +353,7 @@ fn download(
         let threads: i64 = matches.value_of("threads").unwrap().parse().unwrap();
 
         if threads == 0 {
-            for shadertoy in &shadertoys {
+            for shadertoy in shadertoys {
                 let _r_ = process_shadertoy(shadertoy);
             }
         }
@@ -446,6 +453,14 @@ fn run() -> Result<()> {
                 .case_insensitive(true),
         )
         .arg(
+            Arg::with_name("limit")
+                .short("l")
+                .long("limit")
+                .help("The maximum number of shaders to download. -1 = no limit")
+                .takes_value(true)
+                .default_value("-1")
+        )
+        .arg(
             Arg::with_name("threads")
                 .short("t")
                 .long("threads")
@@ -463,6 +478,38 @@ fn run() -> Result<()> {
                 .short("v")
                 .long("verbose")
                 .help("More verbose log output, including list of all shadertoys found"),
+        )
+        .arg(
+            Arg::with_name("res_width")
+                .short("w")
+                .long("reswidth")
+                .help("Window resolution width")
+                .takes_value(true)
+                .default_value("1024"),
+        )
+        .arg(
+            Arg::with_name("res_height")
+                .short("h")
+                .long("resheight")
+                .help("Window resolution height")
+                .takes_value(true)
+                .default_value("768"),
+        )
+        .arg(
+            Arg::with_name("grid_width")
+                .short("x")
+                .long("gridwidth")
+                .help("Grid width")
+                .takes_value(true)
+                .default_value("4"),
+        )
+        .arg(
+            Arg::with_name("grid_height")
+                .short("y")
+                .long("gridheight")
+                .help("Grid height")
+                .takes_value(true)
+                .default_value("4"),
         )
         .get_matches();
 
@@ -530,7 +577,10 @@ fn run() -> Result<()> {
 
     let mut events_loop = winit::EventsLoop::new();
     let window = winit::WindowBuilder::new()
-        .with_dimensions(1024, 768)
+        .with_dimensions(
+            matches.value_of("res_width").unwrap().parse::<u32>().unwrap(),
+            matches.value_of("res_height").unwrap().parse::<u32>().unwrap()
+        )
         .with_title("Shadertoy Browser".to_string())
         .build(&events_loop)
         .chain_err(|| "error creating window")?;
@@ -550,7 +600,10 @@ fn run() -> Result<()> {
     
     let mut shadertoy_index = 0usize;
     let mut draw_grid = true;
-    let grid_size = (4, 4);
+    let grid_size = (
+        matches.value_of("grid_width").unwrap().parse::<usize>().unwrap(),
+        matches.value_of("grid_height").unwrap().parse::<usize>().unwrap()
+    );
     
     // frame loop
 

@@ -53,13 +53,19 @@ FLAGS:
     -v, --verbose     More verbose log output, including list of all shadertoys found
 
 OPTIONS:
-    -k, --apikey <key>          Set shadertoy API key to use. Create your key on https://www.shadertoy.com/myapps
-                                [default: BtHtWD]
-    -f, --filter <filter>...    Inclusion filters [values: VR, SoundOutput, SoundInput, Webcam, MultiPass, MusicStream]
-    -o, --order <order>         Sort order [default: Popular]  [values: Name, Love, Popular, Newest, Hot]
-    -s, --search <string>       Search string to filter which shadertoys to get
-    -t, --threads <threads>     How many threads to use for downloading & processing shaders. 0 = disables threading, -1
-                                = use all logical processors [default: -1]
+    -k, --apikey <key>                Set shadertoy API key to use. Create your key on https://www.shadertoy.com/myapps
+                                      [default: BtHtWD]
+    -f, --filter <filter>...          Inclusion filters [values: VR, SoundOutput, SoundInput, Webcam, MultiPass,
+                                      MusicStream]
+    -y, --gridheight <grid_height>    Grid height [default: 4]
+    -x, --gridwidth <grid_width>      Grid width [default: 4]
+    -l, --limit <limit>               The maximum number of shaders to download. -1 = no limit [default: -1]
+    -o, --order <order>               Sort order [default: Popular]  [values: Name, Love, Popular, Newest, Hot]
+    -h, --resheight <res_height>      Window resolution height [default: 768]
+    -w, --reswidth <res_width>        Window resolution width [default: 1024]
+    -s, --search <string>             Search string to filter which shadertoys to get
+    -t, --threads <threads>           How many threads to use for downloading & processing shaders. 0 = disables
+                                      threading, -1 = use all logical processors [default: -1]
 ```
 
 To use the Rust shadertoy API directly in another app or library, check out the [`shadertoy`](https://crates.io/crates/shadertoy) crate, [docs](http://docs.rs/shadertoy) and [README](src/shadertoy/README.MD).
