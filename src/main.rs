@@ -481,7 +481,6 @@ fn run() -> Result<()> {
         )
         .arg(
             Arg::with_name("res_width")
-                .short("w")
                 .long("reswidth")
                 .help("Window resolution width")
                 .takes_value(true)
@@ -489,7 +488,6 @@ fn run() -> Result<()> {
         )
         .arg(
             Arg::with_name("res_height")
-                .short("h")
                 .long("resheight")
                 .help("Window resolution height")
                 .takes_value(true)
@@ -497,7 +495,6 @@ fn run() -> Result<()> {
         )
         .arg(
             Arg::with_name("grid_width")
-                .short("x")
                 .long("gridwidth")
                 .help("Grid width")
                 .takes_value(true)
@@ -505,7 +502,6 @@ fn run() -> Result<()> {
         )
         .arg(
             Arg::with_name("grid_height")
-                .short("y")
                 .long("gridheight")
                 .help("Grid height")
                 .takes_value(true)
