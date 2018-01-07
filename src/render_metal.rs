@@ -60,7 +60,7 @@ unsafe impl Sync for MetalRenderBackend {
 }
 
 impl MetalRenderBackend {
-    pub fn new() -> MetalRenderBackend {
+    pub fn new() -> Result<MetalRenderBackend> {
         let device = metal::Device::system_default();
         let command_queue = device.new_command_queue();
 
@@ -69,10 +69,10 @@ impl MetalRenderBackend {
 
         let compile_options = metal::CompileOptions::new();
         let vs_source = include_str!("shadertoy_vs.metal");
-        let vs_library = new_library_with_source(&device, vs_source, &compile_options).unwrap();
-        let vs_function = vs_library.get_function("vsMain", None).unwrap();
+        let vs_library = new_library_with_source(&device, vs_source, &compile_options).chain_err(|| "failed creating vertex shader")?;
+        let vs_function = vs_library.get_function("vsMain", None)?;
 
-        MetalRenderBackend {
+        Ok(MetalRenderBackend {
             device,
             command_queue,
             layer: None,
@@ -82,7 +82,7 @@ impl MetalRenderBackend {
             time_last_frame: Instant::now(),
             vs_function: vs_function,
             pipelines: Mutex::new(RefCell::new(vec![])),
-        }
+        })
     }
 
     fn create_pipeline_state(&self, shader_path: &str, shader_source: &str) -> Result<metal::RenderPipelineState> {
@@ -360,7 +360,7 @@ fn new_library_with_source(device: &metal::Device, src: &str, options: &metal::C
             return Err(message.into());
         }
 
-        Err("unreachable?".into())
+        Err("Unknown metal library failure".into())
     }
 }
 

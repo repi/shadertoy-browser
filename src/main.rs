@@ -540,7 +540,13 @@ fn run() -> Result<()> {
 
     #[cfg(target_os="macos")]
     {
-        render_backend = Some(Box::new(MetalRenderBackend::new()));
+        match MetalRenderBackend::new() {
+            Ok(rb) => render_backend = Some(Box::new(rb)),
+            Err(err) => {
+                render_backend = None; 
+                println!("Unable to create metal render backend, error: {}", err);
+            },
+        }
     }
 
     #[cfg(not(target_os="macos"))]
