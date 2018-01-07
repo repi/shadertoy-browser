@@ -51,8 +51,8 @@ environment:
 #    - channel: stable
 #      target: x86_64-pc-windows-gnu
   # Nightly 64-bit GNU
-    - channel: nightly
-      target: x86_64-pc-windows-gnu
+#    - channel: nightly
+#      target: x86_64-pc-windows-gnu
       #cargoflags: --features "unstable"
 
 ### Allowed failures ###
