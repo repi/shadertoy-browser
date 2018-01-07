@@ -48,6 +48,10 @@ objc = "0.2.2"
 objc-foundation = "0.1.1"
 metal-rs = "0.6.1"
 
+[patch.crates-io]
+clicolors-control = { git = "https://github.com/repi/clicolors-control", branch="winapi-0.3" }
+console = { git = "https://github.com/repi/console", branch="winapi-0.3" }
+
 [profile.release]
 debug = true
 
