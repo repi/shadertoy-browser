@@ -528,12 +528,6 @@ fn run() -> Result<()> {
             .open("output.log")?)
         .apply()?;
 
-
-    if cfg!(target_os="windows") {
-        // disable colored text output on Windows as the Windows terminals do not support it yet
-        colored::control::set_override(false);
-    }
-
     // setup renderer
 
     let render_backend: Option<Box<RenderBackend>>;
