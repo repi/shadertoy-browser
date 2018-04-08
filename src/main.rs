@@ -360,7 +360,7 @@ fn download(
         else 
         {
             if threads > 1 {
-                rayon::initialize(rayon::Configuration::new().num_threads(threads as usize)).unwrap();
+                rayon::ThreadPoolBuilder::new().num_threads(threads as usize).build_global().unwrap();                
             }
 
             let init_threads: Mutex<Vec<std::thread::ThreadId>> = Mutex::new(vec![]);
