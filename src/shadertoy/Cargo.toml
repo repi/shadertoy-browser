@@ -15,8 +15,8 @@ travis-ci = { repository = "repi/shadertoy-browser" }
 appveyor = { repository = "repi/shadertoy-browser" }
 
 [dependencies]
-reqwest = "0.8.2"
-serde = "1.0.26"
-serde_json = "1.0.8"
-serde_derive = "1.0.26"
+reqwest = "0.8.5"
+serde = "1.0.50"
+serde_json = "1.0.17"
+serde_derive = "1.0.50"
 error-chain = "0.11.0"
