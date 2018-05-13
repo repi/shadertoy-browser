@@ -1,6 +1,6 @@
 [package]
 name = "shadertoy"
-version = "0.5.1"
+version = "0.6.0"
 description = "Rust library wrapping the Shadertoy REST API to be able to easily search through and download Shadertoy assets."
 authors = ["Johan Andersson <repi@repi.se>"]
 repository = "https://github.com/repi/shadertoy-browser/tree/master/src/shadertoy"
@@ -16,7 +16,7 @@ appveyor = { repository = "repi/shadertoy-browser" }
 
 [dependencies]
 reqwest = "0.8.5"
-serde = "1.0.50"
+serde = "1.0.55"
 serde_json = "1.0.17"
-serde_derive = "1.0.50"
+serde_derive = "1.0.55"
 error-chain = "0.11.0"

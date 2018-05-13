@@ -657,7 +657,7 @@ fn run() -> Result<()> {
 
         events_loop.poll_events(|event| match event {
             winit::Event::WindowEvent {
-                event: winit::WindowEvent::Closed,
+                event: winit::WindowEvent::CloseRequested,
                 ..
             } => running = false,
             winit::Event::WindowEvent {
