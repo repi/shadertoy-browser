@@ -9,10 +9,10 @@ extern crate error_chain;
 extern crate reqwest;
 extern crate serde_json;
 
-mod types;
 mod client;
 mod errors;
+mod types;
 
-pub use types::*;
 pub use client::*;
 pub use errors::*;
+pub use types::*;

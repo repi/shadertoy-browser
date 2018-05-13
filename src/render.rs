@@ -49,7 +49,7 @@ pub struct RenderParams<'a> {
     pub quads: &'a [RenderQuad],
 }
 
-pub trait RenderBackend : Sync {
+pub trait RenderBackend: Sync {
     fn init_window(&mut self, window: &Any);
     fn render_frame(&mut self, params: RenderParams);
 

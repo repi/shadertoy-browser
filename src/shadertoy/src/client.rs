@@ -1,9 +1,9 @@
+use errors::*;
 use reqwest;
 use serde_json;
 use std;
 use std::str::FromStr;
 use types::*;
-use errors::*;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Copy, Clone)]
 pub enum SearchSortOrder {
@@ -11,7 +11,7 @@ pub enum SearchSortOrder {
     Love,
     Popular,
     Newest,
-    Hot
+    Hot,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Copy, Clone)]
@@ -21,7 +21,7 @@ pub enum SearchFilter {
     SoundInput,
     Webcam,
     MultiPass,
-    MusicStream
+    MusicStream,
 }
 
 /// Search parameters for `Client::search`.
@@ -44,7 +44,7 @@ pub struct Client {
 impl FromStr for SearchSortOrder {
     type Err = ();
 
-    fn from_str(s: &str) -> std::result::Result<SearchSortOrder,()> {
+    fn from_str(s: &str) -> std::result::Result<SearchSortOrder, ()> {
         match s {
             "Name" => Ok(SearchSortOrder::Name),
             "Love" => Ok(SearchSortOrder::Love),
@@ -59,7 +59,7 @@ impl FromStr for SearchSortOrder {
 impl FromStr for SearchFilter {
     type Err = ();
 
-    fn from_str(s: &str) -> std::result::Result<SearchFilter,()> {
+    fn from_str(s: &str) -> std::result::Result<SearchFilter, ()> {
         match s {
             "VR" => Ok(SearchFilter::Vr),
             "SoundOutput" => Ok(SearchFilter::SoundOutput),
@@ -85,9 +85,9 @@ impl Client {
     /// Issues a search query for shadertoys.
     /// If the query is successful a list of shader ids will be returned,
     /// which can be used with `get_shader`.
-    /// 
+    ///
     /// # Examples
-    /// 
+    ///
     /// ```
     /// # fn main() {
     /// let client = shadertoy::Client::new("Bd8tWD"); // insert your own API key here
@@ -103,16 +103,20 @@ impl Client {
     /// # }
     /// ```
     pub fn search(&self, params: &SearchParams) -> Result<Vec<String>> {
-
-        let query_str = format!("https://www.shadertoy.com/api/v1/shaders{}?sort={}&{}key={}", 
+        let query_str = format!(
+            "https://www.shadertoy.com/api/v1/shaders{}?sort={}&{}key={}",
             match params.string.is_empty() {
                 false => format!("/query/{}", params.string),
                 true => String::from(""),
             },
             format!("{:?}", params.sort_order).to_lowercase(),
-            params.filters.iter().map(|f| 
-                format!("filter={:?}&", f).to_lowercase()).collect::<String>(),
-            self.api_key);
+            params
+                .filters
+                .iter()
+                .map(|f| format!("filter={:?}&", f).to_lowercase())
+                .collect::<String>(),
+            self.api_key
+        );
 
         let json_str = self.rest_client.get(&query_str).send()?.text()?;
 
@@ -122,11 +126,11 @@ impl Client {
             #[serde(default)]
             #[serde(rename = "Error")]
             error: String,
-            
+
             #[serde(default)]
             #[serde(rename = "Shaders")]
             shaders: u64,
-            
+
             #[serde(default)]
             #[serde(rename = "Results")]
             results: Vec<String>,
@@ -138,7 +142,7 @@ impl Client {
                     bail!("Shadertoy REST search query returned error: {}", r.error);
                 }
                 Ok(r.results)
-            },
+            }
             Err(err) => {
                 Err(Error::from(err)).chain_err(|| "JSON parsing of Shadertoy search result failed")
             }
@@ -147,9 +151,11 @@ impl Client {
 
     /// Retrives a shader given an id.
     pub fn get_shader(&self, shader_id: &str) -> Result<Shader> {
-
         let json_str = self.rest_client
-            .get(&format!("https://www.shadertoy.com/api/v1/shaders/{}?key={}", shader_id, self.api_key))
+            .get(&format!(
+                "https://www.shadertoy.com/api/v1/shaders/{}?key={}",
+                shader_id, self.api_key
+            ))
             .send()?
             .text()?;
 
@@ -170,7 +176,7 @@ impl Client {
                     bail!("Shadertoy REST shader query returned error: {}", r.error);
                 }
                 Ok(r.shader)
-            },
+            }
             Err(err) => {
                 Err(Error::from(err)).chain_err(|| "JSON parsing of Shadertoy shader rootfailed")
             }

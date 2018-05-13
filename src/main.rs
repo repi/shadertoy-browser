@@ -1,7 +1,7 @@
 //! Small [Shadertoy](http://shadertoy.com) browser & viewer for Mac built in [Rust](https://www.rust-lang.org).
-//! 
+//!
 //! This application uses the [Shadertoy REST API](http://shadertoy.com/api) to search for Shadertoys and then downloads them locally and converts them using [`shaderc-rs`](https://crates.io/crates/shaderc) and [`spirv-cross`](https://crates.io/crates/spirv_cross) to be natively rendered on Mac using [`metal-rs`](https://crates.io/crates/metal-rs).
-//! 
+//!
 //! The API queries are done through the [`shadertoy`](https://crates.io/crates/shadertoy) crate, which can be found in  `src/shadertoy`
 
 #![allow(dead_code)]
@@ -16,37 +16,36 @@ extern crate thread_profiler;
 #[macro_use]
 extern crate log;
 
-extern crate shadertoy;
-extern crate reqwest;
-extern crate floating_duration;
 extern crate chrono;
-extern crate rayon;
-extern crate winit;
+extern crate colored;
+extern crate fern;
+extern crate floating_duration;
+extern crate indicatif;
 extern crate open;
+extern crate rayon;
+extern crate reqwest;
 extern crate rust_base58 as base58;
 extern crate serde_json;
-extern crate colored;
-extern crate indicatif;
-extern crate fern;
 extern crate sha3;
+extern crate shadertoy;
+extern crate winit;
 
-use std::io::Write;
-use std::io::prelude::*;
+use base58::ToBase58;
+use clap::{App, Arg};
+use colored::*;
+use floating_duration::TimeAsFloat;
+use indicatif::{ProgressBar, ProgressStyle};
+use rayon::prelude::*;
+use sha3::{Digest as Sha3Digest, Sha3_256};
 use std::fs::File;
+use std::io::prelude::*;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
-use std::time::{Instant};
-use floating_duration::{TimeAsFloat};
-use clap::{Arg, App};   
-use rayon::prelude::*;
-use base58::ToBase58;
-use indicatif::{ProgressBar, ProgressStyle};
-use colored::*;
-use sha3::{Digest as Sha3Digest, Sha3_256};
+use std::time::Instant;
 
 mod render;
 use render::*;
-
 
 // TODO try and get rid of most of this and only depend on render_metal
 #[cfg(target_os = "macos")]
@@ -62,11 +61,11 @@ extern crate cocoa;
 use cocoa::foundation::NSAutoreleasePool;
 
 mod errors {
-    error_chain!{    
+    error_chain!{
         links {
             Shadertoy(::shadertoy::Error, ::shadertoy::ErrorKind);
         }
-    
+
         foreign_links {
             Fmt(::std::fmt::Error);
             Io(::std::io::Error);
@@ -75,13 +74,11 @@ mod errors {
             Reqwest(::reqwest::Error);
             Log(::log::SetLoggerError);
         }
-    }            
+    }
 }
 use errors::*;
 
-
 struct BuiltShadertoy {
-
     info: shadertoy::ShaderInfo,
 
     //shader_path: String,
@@ -89,20 +86,17 @@ struct BuiltShadertoy {
     pipeline_handle: RenderPipelineHandle,
 }
 
-
 fn write_file<P: AsRef<Path>>(path: P, buf: &[u8]) -> Result<()> {
-
     if let Some(parent_path) = path.as_ref().parent() {
         std::fs::create_dir_all(parent_path)?;
-    } 
-    
+    }
+
     let mut file = File::create(&path)?;
     file.write_all(buf)?;
     Ok(())
 }
 
 fn search(client: &shadertoy::Client, matches: &clap::ArgMatches) -> Result<Vec<String>> {
-
     profile_scope!("search");
 
     use std::str::FromStr;
@@ -111,29 +105,39 @@ fn search(client: &shadertoy::Client, matches: &clap::ArgMatches) -> Result<Vec<
 
     let search_params = shadertoy::SearchParams {
         string: matches.value_of("search").unwrap_or(""),
-        
+
         sort_order: value_t!(matches, "order", shadertoy::SearchSortOrder)?,
 
         filters: match matches.values_of("filter") {
-            Some(args) => args.map(|f| shadertoy::SearchFilter::from_str(f).unwrap()).collect(),
+            Some(args) => args.map(|f| shadertoy::SearchFilter::from_str(f).unwrap())
+                .collect(),
             None => vec![],
         },
-   };
+    };
 
     println!("{:?}", search_params);
 
     // check if we can find a cached search on disk
 
-    let path = format!("output/query/{}", serde_json::to_string(&search_params)?.as_bytes().to_base58());
+    let path = format!(
+        "output/query/{}",
+        serde_json::to_string(&search_params)?
+            .as_bytes()
+            .to_base58()
+    );
 
     if let Ok(mut file) = File::open(&path) {
         let mut json_str = String::new();
-        file.read_to_string(&mut json_str).chain_err(|| "failed reading json shader file")?;
+        file.read_to_string(&mut json_str)
+            .chain_err(|| "failed reading json shader file")?;
         let search_result: serde_json::Result<Vec<String>> = serde_json::from_str(&json_str);
         search_result.chain_err(|| "shader query json deserialization failed")
     } else {
         // issue the actual request
-        match client.search(&search_params).chain_err(|| "shadertoy search failed") {
+        match client
+            .search(&search_params)
+            .chain_err(|| "shadertoy search failed")
+        {
             Ok(result) => {
                 // cache search results to a file on disk
                 write_file(&path, serde_json::to_string(&result)?.as_bytes())?;
@@ -144,23 +148,24 @@ fn search(client: &shadertoy::Client, matches: &clap::ArgMatches) -> Result<Vec<
     }
 }
 
-
 fn download(
-    matches: &clap::ArgMatches, 
-    render_backend: &Option<Box<RenderBackend>>) -> Result<Vec<BuiltShadertoy>> 
-{
+    matches: &clap::ArgMatches,
+    render_backend: &Option<Box<RenderBackend>>,
+) -> Result<Vec<BuiltShadertoy>> {
     profile_scope!("download");
-    
+
     let time = Instant::now();
 
     let api_key = matches.value_of("apikey").unwrap();
     let client = shadertoy::Client::new(api_key);
-    
+
     let pb = ProgressBar::new_spinner();
     pb.set_style(ProgressStyle::default_spinner().template("")); // workaround
     pb.enable_steady_tick(200);
     pb.tick(); // workaround for https://github.com/mitsuhiko/indicatif/issues/36
-    pb.set_style(ProgressStyle::default_spinner().template("{spinner:.green}  Searching{wide_msg}"));
+    pb.set_style(
+        ProgressStyle::default_spinner().template("{spinner:.green}  Searching{wide_msg}"),
+    );
 
     let shadertoys_found = search(&client, matches)?;
     let shadertoys_found_len = shadertoys_found.len();
@@ -171,21 +176,26 @@ fn download(
         shadertoys_dl_len as usize
     };
     let shadertoys = &shadertoys_found[0..shadertoys_len];
-    
-    pb.finish_with_message(
-        &format!(": {} found, {} will download [{:.2} s]", shadertoys_found_len, shadertoys_len, time.elapsed().as_fractional_secs()));
+
+    pb.finish_with_message(&format!(
+        ": {} found, {} will download [{:.2} s]",
+        shadertoys_found_len,
+        shadertoys_len,
+        time.elapsed().as_fractional_secs()
+    ));
 
     let built_shadertoys = Mutex::new(Vec::<BuiltShadertoy>::new());
 
-    let pb = ProgressBar::new(shadertoys_len as u64);    
-    pb.set_style(ProgressStyle::default_bar()
-        .template("{spinner:.green} Processing [{bar:40.cyan/blue}] {pos}/{len} {eta}")
-        .progress_chars("##-"));
+    let pb = ProgressBar::new(shadertoys_len as u64);
+    pb.set_style(
+        ProgressStyle::default_bar()
+            .template("{spinner:.green} Processing [{bar:40.cyan/blue}] {pos}/{len} {eta}")
+            .progress_chars("##-"),
+    );
 
     {
-        // closure for processing a shadertoy    
+        // closure for processing a shadertoy
         let process_shadertoy = |shadertoy| -> Result<()> {
-
             let path = PathBuf::from(format!("output/shader/{}/{}.json", shadertoy, shadertoy));
 
             let shader;
@@ -201,17 +211,18 @@ fn download(
                 shader = serde_json::from_str(&json_str)?;
             }
 
-            info!("Found shadertoy {}: {} by {} ({} views, {} likes)", 
+            info!(
+                "Found shadertoy {}: {} by {} ({} views, {} likes)",
                 shader.info.id,
-                shader.info.name, 
+                shader.info.name,
                 shader.info.username,
                 shader.info.viewed,
-                shader.info.likes);
-            
+                shader.info.likes
+            );
+
             //pb.set_message(&format!("\"{}\"", shader.info.name));
 
             for pass in &shader.renderpass {
-
                 // generate a GLSL snippet containing the sampler declarations
                 // as they are dependent on the renderpass inputs in the JSON
                 // for exaxmple:
@@ -236,8 +247,11 @@ fn download(
                         _ => {
                             panic!("Unknown ctype: {}", input.ctype);
                         }
-                    };                
-                    sampler_source.push_str(&format!("uniform {} iChannel{};\n", glsl_type, input.channel));
+                    };
+                    sampler_source.push_str(&format!(
+                        "uniform {} iChannel{};\n",
+                        glsl_type, input.channel
+                    ));
                 }
 
                 let header_source = include_str!("shadertoy_header.glsl");
@@ -250,7 +264,10 @@ fn download(
                 };
 
                 // add our header source first which includes shadertoy constant & resource definitions
-                let full_source = format!("{}\n{}\n{}\n{}", header_source, sampler_source, pass.code, footer_source);
+                let full_source = format!(
+                    "{}\n{}\n{}\n{}",
+                    header_source, sampler_source, pass.code, footer_source
+                );
 
                 // save out the source GLSL file, for debugging
                 let shader_path = format!("output/shader/{}/{}{}", shadertoy, shadertoy, pass.name);
@@ -258,18 +275,18 @@ fn download(
                 write_file(&glsl_path, full_source.as_bytes())?;
 
                 // we currently only support single-pass image shaders, with no inputs
-                if pass.pass_type == "image" && pass.inputs.is_empty() && shader.renderpass.len() == 1 {
-
+                if pass.pass_type == "image" && pass.inputs.is_empty()
+                    && shader.renderpass.len() == 1
+                {
                     // these shaders get stuck in forever compilation, so let's skip them forn ow
                     // TODO should make compilation more robust and be able to timeout and then remove this
-                    let skip_shaders = [ "XdsBzj", "XtlSD7", "MlB3Wt", "4ssfzj", "XllSWf", "4td3z4" ];
-                    
+                    let skip_shaders = ["XdsBzj", "XtlSD7", "MlB3Wt", "4ssfzj", "XllSWf", "4td3z4"];
+
                     if skip_shaders.contains(&shader.info.id.as_str()) {
                         continue;
                     }
 
                     if let Some(ref rb) = *render_backend {
-
                         profile_scope!("new_pipeline");
 
                         let time = Instant::now();
@@ -281,46 +298,50 @@ fn download(
                         // them without nay changes
                         let source_hash = Sha3_256::digest(full_source.as_bytes());
                         let code_version = 1; // bump this if any of the code in new_pipeline is changed that could affect the success
-                        let error_path = PathBuf::from(&format!("output/pipeline_fail/{}/{}", code_version, source_hash.to_base58()));
+                        let error_path = PathBuf::from(&format!(
+                            "output/pipeline_fail/{}/{}",
+                            code_version,
+                            source_hash.to_base58()
+                        ));
 
                         if error_path.exists() {
-                            error!("Skipped building failing shader for shadertoy {} ({} by {})", 
-                                shader.info.id,
-                                shader.info.name,
-                                shader.info.username);
+                            error!(
+                                "Skipped building failing shader for shadertoy {} ({} by {})",
+                                shader.info.id, shader.info.name, shader.info.username
+                            );
                         } else {
                             match rb.new_pipeline(&shader_path, full_source.as_str()) {
                                 Ok(pipeline_handle) => {
-                                    info!("Built shadertoy pipeline for {} ({} by {}) in {:.1} ms", 
+                                    info!(
+                                        "Built shadertoy pipeline for {} ({} by {}) in {:.1} ms",
                                         shader.info.id,
                                         shader.info.name,
                                         shader.info.username,
-                                        time.elapsed().as_fractional_millis());
+                                        time.elapsed().as_fractional_millis()
+                                    );
 
                                     let mut bs = built_shadertoys.lock().unwrap();
                                     bs.push(BuiltShadertoy {
                                         info: shader.info.clone(),
                                         pipeline_handle,
                                     });
-                                },
+                                }
                                 Err(err) => {
-                                    error!("Failed building shader for shadertoy {} ({} by {}): {}", 
-                                        shader.info.id,
-                                        shader.info.name,
-                                        shader.info.username,
-                                        err);
-                                    
+                                    error!(
+                                        "Failed building shader for shadertoy {} ({} by {}): {}",
+                                        shader.info.id, shader.info.name, shader.info.username, err
+                                    );
+
                                     write_file(error_path, format!("{}", err).as_bytes())?;
-                                },
+                                }
                             }
                         }
                     }
                 }
-                            
+
                 // download texture inputs
 
                 for input in &pass.inputs {
-
                     match input.ctype.as_str() {
                         "texture" | "volume" | "cubemap" | "buffer" => (),
                         _ => continue,
@@ -329,8 +350,8 @@ fn download(
                     let path = PathBuf::from(format!("output{}", input.src));
 
                     if !path.exists() {
-
-                        let mut data_response = client.rest_client
+                        let mut data_response = client
+                            .rest_client
                             .get(&format!("https://www.shadertoy.com/{}", input.src))
                             .send()?;
 
@@ -340,7 +361,7 @@ fn download(
                         info!("Asset downloaded: {}, {} bytes", input.src, data.len());
 
                         write_file(&path, &data)?;
-                    } 
+                    }
                 }
             }
 
@@ -349,28 +370,27 @@ fn download(
             Ok(())
         };
 
-        
         let threads: i64 = matches.value_of("threads").unwrap().parse().unwrap();
 
         if threads == 0 {
             for shadertoy in shadertoys {
                 let _r_ = process_shadertoy(shadertoy);
             }
-        }
-        else 
-        {
+        } else {
             if threads > 1 {
-                rayon::ThreadPoolBuilder::new().num_threads(threads as usize).build_global().unwrap();                
+                rayon::ThreadPoolBuilder::new()
+                    .num_threads(threads as usize)
+                    .build_global()
+                    .unwrap();
             }
 
             let init_threads: Mutex<Vec<std::thread::ThreadId>> = Mutex::new(vec![]);
 
             shadertoys.par_iter().for_each(|shadertoy| {
-
                 // TODO clean up & simplify this hacky way of naming the job worker threads
                 {
                     let mut it = init_threads.lock().unwrap();
-                    if !it.contains(&std::thread::current().id()) {                        
+                    if !it.contains(&std::thread::current().id()) {
                         thread_profiler::register_thread_with_profiler();
                         it.push(std::thread::current().id());
                     }
@@ -385,32 +405,35 @@ fn download(
 
     let built_shadertoys = built_shadertoys.into_inner().unwrap();
 
-    println!("  Processing: {} built successfully [{:.2} s]", 
-        built_shadertoys.len(), 
-        time.elapsed().as_fractional_secs());
+    println!(
+        "  Processing: {} built successfully [{:.2} s]",
+        built_shadertoys.len(),
+        time.elapsed().as_fractional_secs()
+    );
 
-
-    if matches.is_present("verbose") {   
+    if matches.is_present("verbose") {
         for shadertoy in &built_shadertoys {
-            println!("{}: {} by {} ({} views, {} likes)", 
+            println!(
+                "{}: {} by {} ({} views, {} likes)",
                 shadertoy.info.id,
-                shadertoy.info.name.green(), 
+                shadertoy.info.name.green(),
                 shadertoy.info.username.blue(),
                 shadertoy.info.viewed,
-                shadertoy.info.likes);
+                shadertoy.info.likes
+            );
         }
-        println!("{} / {} shadertoys built successfully [{:.2} s]",
-            built_shadertoys.len(), 
+        println!(
+            "{} / {} shadertoys built successfully [{:.2} s]",
+            built_shadertoys.len(),
             shadertoys.len(),
-            time.elapsed().as_fractional_secs());
+            time.elapsed().as_fractional_secs()
+        );
     }
-
 
     Ok(built_shadertoys)
 }
 
 fn run() -> Result<()> {
-
     let matches = App::new("Shadertoy Browser")
         .version(crate_version!())
         .author("Johan Andersson <repi@repi.se>")
@@ -509,7 +532,7 @@ fn run() -> Result<()> {
         )
         .get_matches();
 
-    // setup log 
+    // setup log
 
     fern::Dispatch::new()
         .format(|out, message, record| {
@@ -532,18 +555,18 @@ fn run() -> Result<()> {
 
     let render_backend: Option<Box<RenderBackend>>;
 
-    #[cfg(target_os="macos")]
+    #[cfg(target_os = "macos")]
     {
         match MetalRenderBackend::new() {
             Ok(rb) => render_backend = Some(Box::new(rb)),
             Err(err) => {
-                render_backend = None; 
+                render_backend = None;
                 println!("Unable to create metal render backend, error: {}", err);
-            },
+            }
         }
     }
 
-    #[cfg(not(target_os="macos"))]
+    #[cfg(not(target_os = "macos"))]
     {
         render_backend = None;
     }
@@ -552,30 +575,43 @@ fn run() -> Result<()> {
 
     // download and process assets
 
-    let mut built_shadertoy_shaders = download(&matches, &render_backend).chain_err(|| "query for shaders failed")?;
+    let mut built_shadertoy_shaders =
+        download(&matches, &render_backend).chain_err(|| "query for shaders failed")?;
 
     // write out profiler data for startup
     {
         let time = Instant::now();
         let file_name = "profile-startup.json";
         thread_profiler::write_profile(file_name);
-        info!("Saved profiler log to \"{}\" [{:.1} ms]", file_name, time.elapsed().as_fractional_millis());
+        info!(
+            "Saved profiler log to \"{}\" [{:.1} ms]",
+            file_name,
+            time.elapsed().as_fractional_millis()
+        );
     }
 
     if built_shadertoy_shaders.is_empty() || matches.is_present("headless") {
         return Ok(());
     }
 
-    let mut render_backend = render_backend.chain_err(|| "skipping rendering, as have no renderer available")?;
-
+    let mut render_backend =
+        render_backend.chain_err(|| "skipping rendering, as have no renderer available")?;
 
     // set up rendering window
 
     let mut events_loop = winit::EventsLoop::new();
     let window = winit::WindowBuilder::new()
         .with_dimensions(
-            matches.value_of("res_width").unwrap().parse::<u32>().unwrap(),
-            matches.value_of("res_height").unwrap().parse::<u32>().unwrap()
+            matches
+                .value_of("res_width")
+                .unwrap()
+                .parse::<u32>()
+                .unwrap(),
+            matches
+                .value_of("res_height")
+                .unwrap()
+                .parse::<u32>()
+                .unwrap(),
         )
         .with_title("Shadertoy Browser".to_string())
         .build(&events_loop)
@@ -583,8 +619,7 @@ fn run() -> Result<()> {
 
     render_backend.init_window(&window);
 
-
-    #[cfg(target_os="macos")]
+    #[cfg(target_os = "macos")]
     let mut pool = unsafe { NSAutoreleasePool::new(cocoa::base::nil) };
 
     let mut running = true;
@@ -593,18 +628,25 @@ fn run() -> Result<()> {
     let mut mouse_pressed_pos = (0.0f64, 0.0f64);
     let mut mouse_click_pos = (0.0f64, 0.0f64);
     let mut mouse_lmb_pressed = false;
-    
+
     let mut shadertoy_index = 0usize;
     let mut draw_grid = true;
     let grid_size = (
-        matches.value_of("grid_width").unwrap().parse::<usize>().unwrap(),
-        matches.value_of("grid_height").unwrap().parse::<usize>().unwrap()
+        matches
+            .value_of("grid_width")
+            .unwrap()
+            .parse::<usize>()
+            .unwrap(),
+        matches
+            .value_of("grid_height")
+            .unwrap()
+            .parse::<usize>()
+            .unwrap(),
     );
-    
+
     // frame loop
 
     while running {
-
         let shadertoy_increment = if draw_grid {
             grid_size.0 * grid_size.1
         } else {
@@ -614,14 +656,23 @@ fn run() -> Result<()> {
         // handle window events
 
         events_loop.poll_events(|event| match event {
-            winit::Event::WindowEvent { event: winit::WindowEvent::Closed, .. } => running = false,
-            winit::Event::WindowEvent { event: winit::WindowEvent::CursorMoved { position, .. }, .. } => {
+            winit::Event::WindowEvent {
+                event: winit::WindowEvent::Closed,
+                ..
+            } => running = false,
+            winit::Event::WindowEvent {
+                event: winit::WindowEvent::CursorMoved { position, .. },
+                ..
+            } => {
                 mouse_pos = position;
                 if mouse_lmb_pressed {
                     mouse_pressed_pos = position;
                 }
             }
-            winit::Event::WindowEvent { event: winit::WindowEvent::MouseInput { state, button, .. }, .. } => {
+            winit::Event::WindowEvent {
+                event: winit::WindowEvent::MouseInput { state, button, .. },
+                ..
+            } => {
                 if state == winit::ElementState::Pressed {
                     if button == winit::MouseButton::Left {
                         if !mouse_lmb_pressed {
@@ -629,21 +680,24 @@ fn run() -> Result<()> {
                         }
                         mouse_lmb_pressed = true;
                     }
-                }
-                else {
+                } else {
                     mouse_pressed_pos = (0.0, 0.0);
                     mouse_click_pos = (0.0, 0.0);
                     mouse_lmb_pressed = false;
                 }
             }
-            winit::Event::WindowEvent { event: winit::WindowEvent::KeyboardInput { input, .. }, .. } => {
+            winit::Event::WindowEvent {
+                event: winit::WindowEvent::KeyboardInput { input, .. },
+                ..
+            } => {
                 if input.state == winit::ElementState::Pressed {
                     match input.virtual_keycode {
                         Some(winit::VirtualKeyCode::Left) => {
                             shadertoy_index = shadertoy_index.saturating_sub(shadertoy_increment);
                         }
                         Some(winit::VirtualKeyCode::Right) => {
-                            if shadertoy_index + shadertoy_increment < built_shadertoy_shaders.len() {
+                            if shadertoy_index + shadertoy_increment < built_shadertoy_shaders.len()
+                            {
                                 shadertoy_index += shadertoy_increment;
                             }
                         }
@@ -651,8 +705,13 @@ fn run() -> Result<()> {
                             draw_grid = !draw_grid;
                         }
                         Some(winit::VirtualKeyCode::Return) => {
-                            if let Some(ref shadertoy) = built_shadertoy_shaders.get_mut(shadertoy_index) {
-                                let _r_ = open::that(format!("https://www.shadertoy.com/view/{}", shadertoy.info.id));
+                            if let Some(ref shadertoy) =
+                                built_shadertoy_shaders.get_mut(shadertoy_index)
+                            {
+                                let _r_ = open::that(format!(
+                                    "https://www.shadertoy.com/view/{}",
+                                    shadertoy.info.id
+                                ));
                             }
                         }
                         // this panics on Mac as "not yet implemented"
@@ -672,42 +731,37 @@ fn run() -> Result<()> {
                     }
                 }
             }
-            winit::Event::WindowEvent { event: winit::WindowEvent::Resized { .. }, .. } => {
-                render_backend.init_window(&window);        
+            winit::Event::WindowEvent {
+                event: winit::WindowEvent::Resized { .. },
+                ..
+            } => {
+                render_backend.init_window(&window);
             }
             _ => (),
         });
-        
 
         // render frame
 
         let mut quads: Vec<RenderQuad> = vec![];
 
         if draw_grid {
-
             let start_index = shadertoy_index / shadertoy_increment * shadertoy_increment;
-            
+
             for index in 0..shadertoy_increment {
-
                 if let Some(shadertoy) = built_shadertoy_shaders.get(start_index + index) {
-
-                    let grid_pos = (index % grid_size.0, index / grid_size.0 );
+                    let grid_pos = (index % grid_size.0, index / grid_size.0);
 
                     quads.push(RenderQuad {
                         pos: (
-                            (grid_pos.0 as f32) / (grid_size.0 as f32), 
-                            (grid_pos.1 as f32) / (grid_size.1 as f32)
+                            (grid_pos.0 as f32) / (grid_size.0 as f32),
+                            (grid_pos.1 as f32) / (grid_size.1 as f32),
                         ),
-                        size: (
-                            1.0 / (grid_size.0 as f32), 
-                            1.0 / (grid_size.1 as f32)
-                        ),
+                        size: (1.0 / (grid_size.0 as f32), 1.0 / (grid_size.1 as f32)),
                         pipeline_handle: shadertoy.pipeline_handle,
                     });
                 }
             }
         } else if let Some(shadertoy) = built_shadertoy_shaders.get(shadertoy_index) {
-
             quads.push(RenderQuad {
                 pos: (0.0, 0.0),
                 size: (1.0, 1.0),
@@ -720,18 +774,22 @@ fn run() -> Result<()> {
         let active_shadertoy = built_shadertoy_shaders.get(shadertoy_index);
 
         if draw_grid && !built_shadertoy_shaders.is_empty() {
-            window.set_title(&format!("Shadertoy ({} / {})", 
-                shadertoy_index+1, 
-                built_shadertoy_shaders.len()));
+            window.set_title(&format!(
+                "Shadertoy ({} / {})",
+                shadertoy_index + 1,
+                built_shadertoy_shaders.len()
+            ));
         } else if active_shadertoy.is_some() {
-            window.set_title(&format!("Shadertoy ({} / {}) - {} by {}", 
-                shadertoy_index+1, 
-                built_shadertoy_shaders.len(), 
-                active_shadertoy.unwrap().info.name, 
-                active_shadertoy.unwrap().info.username));
+            window.set_title(&format!(
+                "Shadertoy ({} / {}) - {} by {}",
+                shadertoy_index + 1,
+                built_shadertoy_shaders.len(),
+                active_shadertoy.unwrap().info.name,
+                active_shadertoy.unwrap().info.username
+            ));
         } else {
             window.set_title("Shadertoy Browser");
-        }            
+        }
 
         // render and present the frame
 
@@ -739,7 +797,7 @@ fn run() -> Result<()> {
             clear_color: (0.0, 0.0, 0.0, 0.0),
             mouse_pos: mouse_pressed_pos,
             mouse_click_pos,
-            quads: &quads
+            quads: &quads,
         });
 
         #[cfg(target_os = "macos")]
@@ -754,8 +812,8 @@ fn run() -> Result<()> {
 
 fn main() {
     if let Err(ref e) = run() {
-        use std::io::Write;
-        use error_chain::ChainedError; // trait which holds `display_chain`
+        use error_chain::ChainedError;
+        use std::io::Write; // trait which holds `display_chain`
         let stderr = &mut ::std::io::stderr();
         let errmsg = "Error writing to stderr";
 

@@ -67,4 +67,3 @@ pub struct Sampler {
     //pub srgb: bool,
     pub internal: String,
 }
-

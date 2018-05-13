@@ -1,38 +1,38 @@
-extern crate metal_rs as metal;
+extern crate cocoa;
 extern crate foreign_types;
 extern crate libc;
+extern crate metal_rs as metal;
+extern crate objc_foundation;
 extern crate shaderc;
 extern crate spirv_cross;
 extern crate winit;
-extern crate cocoa;
-extern crate objc_foundation;
 
-use std::time::Instant;
-use std::mem;
 use std::any::Any;
+use std::mem;
+use std::time::Instant;
 
-use std::ffi::CStr;
-use std::cell::RefCell;
-use std::sync::Mutex;
-use objc::runtime::{Object, YES};
 use self::foreign_types::ForeignType;
+use objc::runtime::{Object, YES};
+use std::cell::RefCell;
+use std::ffi::CStr;
+use std::sync::Mutex;
 
+use cocoa::appkit::{NSView, NSWindow};
 use cocoa::base::id as cocoa_id;
 use cocoa::foundation::NSSize;
-use cocoa::appkit::{NSView, NSWindow};
 use winit::os::macos::WindowExt;
 
-use floating_duration::TimeAsFloat;
 use chrono::prelude::*;
+use floating_duration::TimeAsFloat;
 
 use std;
 use std::fs::File;
-use std::path::{Path, PathBuf};
-use std::io::Write;
 use std::io::prelude::*;
+use std::io::Write;
+use std::path::{Path, PathBuf};
 
-use render::*;
 use errors::*;
+use render::*;
 
 struct MetalRenderPipeline {
     pipeline_state: metal::RenderPipelineState,
@@ -55,9 +55,7 @@ pub struct MetalRenderBackend {
     pipelines: Mutex<RefCell<Vec<MetalRenderPipeline>>>,
 }
 
-unsafe impl Sync for MetalRenderBackend {
-    
-}
+unsafe impl Sync for MetalRenderBackend {}
 
 impl MetalRenderBackend {
     pub fn new() -> Result<MetalRenderBackend> {
@@ -69,7 +67,8 @@ impl MetalRenderBackend {
 
         let compile_options = metal::CompileOptions::new();
         let vs_source = include_str!("shadertoy_vs.metal");
-        let vs_library = new_library_with_source(&device, vs_source, &compile_options).chain_err(|| "failed creating vertex shader")?;
+        let vs_library = new_library_with_source(&device, vs_source, &compile_options)
+            .chain_err(|| "failed creating vertex shader")?;
         let vs_function = vs_library.get_function("vsMain", None)?;
 
         Ok(MetalRenderBackend {
@@ -85,21 +84,22 @@ impl MetalRenderBackend {
         })
     }
 
-    fn create_pipeline_state(&self, shader_path: &str, shader_source: &str) -> Result<metal::RenderPipelineState> {
-
+    fn create_pipeline_state(
+        &self,
+        shader_path: &str,
+        shader_source: &str,
+    ) -> Result<metal::RenderPipelineState> {
         profile_scope!("create_pipeline_state");
 
         let ps_library = {
             profile_scope!("library_test");
 
             if false {
-
                 let metal_path = format!("{}.metal", shader_path);
                 let air_path = format!("{}.air", shader_path);
                 let lib_path = format!("{}.metallib_v4", shader_path);
 
                 if !PathBuf::from(&lib_path).exists() {
-            
                     // xcrun -sdk macosx metal MyLibrary.metal -o MyLibrary.air
                     // xcrun -sdk macosx metallib MyLibrary.air -o MyLibrary.metallib
 
@@ -114,9 +114,12 @@ impl MetalRenderBackend {
                     };
 
                     if !p.status.success() {
-                        return Err(format!("Metal shader compiler failed: {}", String::from_utf8_lossy(&p.stderr)).into());
+                        return Err(format!(
+                            "Metal shader compiler failed: {}",
+                            String::from_utf8_lossy(&p.stderr)
+                        ).into());
                     }
-                
+
                     let p = {
                         profile_scope!("metallib_compile");
                         std::process::Command::new("xcrun")
@@ -126,15 +129,17 @@ impl MetalRenderBackend {
                     };
 
                     if !p.status.success() {
-                        return Err(format!("Metal library compiler failed: {}", String::from_utf8_lossy(&p.stderr)).into());
+                        return Err(format!(
+                            "Metal library compiler failed: {}",
+                            String::from_utf8_lossy(&p.stderr)
+                        ).into());
                     }
                 } else {
-                    info!("Metal library cached for {}", shader_path);                    
+                    info!("Metal library cached for {}", shader_path);
                 }
 
                 profile_scope!("new_library_with_file");
                 self.device.new_library_with_file(lib_path)?
-
             } else {
                 profile_scope!("new_library_with_source");
                 let compile_options = metal::CompileOptions::new();
@@ -188,7 +193,6 @@ impl RenderBackend for MetalRenderBackend {
     }
 
     fn render_frame(&mut self, params: RenderParams) {
-
         if let Some(ref layer) = self.layer {
             if let Some(drawable) = layer.next_drawable() {
                 let render_pass_descriptor = metal::RenderPassDescriptor::new();
@@ -207,7 +211,8 @@ impl RenderBackend for MetalRenderBackend {
                 color_attachment.set_store_action(metal::MTLStoreAction::Store);
 
                 let command_buffer = self.command_queue.new_command_buffer();
-                let parallel_encoder = command_buffer.new_parallel_render_command_encoder(render_pass_descriptor);
+                let parallel_encoder =
+                    command_buffer.new_parallel_render_command_encoder(render_pass_descriptor);
                 let encoder = parallel_encoder.render_command_encoder();
 
                 let w = drawable.texture().width() as f32;
@@ -271,8 +276,16 @@ impl RenderBackend for MetalRenderBackend {
 
                     encoder.set_render_pipeline_state(&pipeline.pipeline_state);
                     encoder.set_cull_mode(metal::MTLCullMode::None);
-                    encoder.set_vertex_bytes(0, mem::size_of::<ShadertoyConstants>() as u64, constants_cptr);
-                    encoder.set_fragment_bytes(0, mem::size_of::<ShadertoyConstants>() as u64, constants_cptr);
+                    encoder.set_vertex_bytes(
+                        0,
+                        mem::size_of::<ShadertoyConstants>() as u64,
+                        constants_cptr,
+                    );
+                    encoder.set_fragment_bytes(
+                        0,
+                        mem::size_of::<ShadertoyConstants>() as u64,
+                        constants_cptr,
+                    );
 
                     encoder.set_viewport(metal::MTLViewport {
                         originX: (quad.pos.0 * w).into(),
@@ -299,7 +312,6 @@ impl RenderBackend for MetalRenderBackend {
     }
 
     fn new_pipeline(&self, shader_path: &str, shader_source: &str) -> Result<RenderPipelineHandle> {
-
         // save out the generated Metal file, for debugging
 
         let metal_path = PathBuf::from(format!("{}.metal", shader_path));
@@ -308,7 +320,8 @@ impl RenderBackend for MetalRenderBackend {
 
         if let Ok(mut file) = File::open(&metal_path) {
             let mut str = String::new();
-            file.read_to_string(&mut str).chain_err(|| "failed reading metal shader file")?;
+            file.read_to_string(&mut str)
+                .chain_err(|| "failed reading metal shader file")?;
             metal_source = str;
         } else {
             metal_source = convert_glsl_to_metal("unknown name", "main", shader_source)?;
@@ -330,9 +343,13 @@ impl RenderBackend for MetalRenderBackend {
 // manually created version as the one in metal-rs will fail and return Err
 // for shaders that just have compilation warnings
 // TODO should figure out how to resolve this properly and merge it back?
-fn new_library_with_source(device: &metal::Device, src: &str, options: &metal::CompileOptionsRef) -> Result<metal::Library> {
-    use cocoa::foundation::NSString as cocoa_NSString;
+fn new_library_with_source(
+    device: &metal::Device,
+    src: &str,
+    options: &metal::CompileOptionsRef,
+) -> Result<metal::Library> {
     use cocoa::base::nil as cocoa_nil;
+    use cocoa::foundation::NSString as cocoa_NSString;
 
     unsafe {
         let source = cocoa_NSString::alloc(cocoa_nil).init_str(src);
@@ -408,7 +425,6 @@ fn new_render_pipeline_state(
 }
 
 fn convert_glsl_to_metal(name: &str, entry_point: &str, source: &str) -> Result<String> {
-
     profile_scope!("convert_glsl_to_metal");
 
     // convert to SPIR-V using shaderc
@@ -440,17 +456,18 @@ fn convert_glsl_to_metal(name: &str, entry_point: &str, source: &str) -> Result<
         Ok(str) => Ok(str),
         Err(e) => match e {
             spirv_cross::ErrorCode::Unhandled => Err("spirv-cross handled error".into()),
-            spirv_cross::ErrorCode::CompilationError(str) => Err(format!("spirv-cross error: {}", str).into()),
+            spirv_cross::ErrorCode::CompilationError(str) => {
+                Err(format!("spirv-cross error: {}", str).into())
+            }
         },
     }
 }
 
 fn write_file<P: AsRef<Path>>(path: P, buf: &[u8]) -> Result<()> {
-
     if let Some(parent_path) = path.as_ref().parent() {
         std::fs::create_dir_all(parent_path)?;
-    } 
-    
+    }
+
     let mut file = File::create(&path)?;
     file.write_all(buf)?;
     Ok(())
