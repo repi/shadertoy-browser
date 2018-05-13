@@ -19,7 +19,7 @@ members = [
 ]
 
 [dependencies]
-shadertoy = { path = "src/shadertoy", version = "0.5" }
+shadertoy = { path = "src/shadertoy", version = "0.5.1" }
 floating-duration = "0.1.1"
 chrono = "0.4.0"
 rayon = "1.0.1"
