@@ -109,7 +109,8 @@ fn search(client: &shadertoy::Client, matches: &clap::ArgMatches) -> Result<Vec<
         sort_order: value_t!(matches, "order", shadertoy::SearchSortOrder)?,
 
         filters: match matches.values_of("filter") {
-            Some(args) => args.map(|f| shadertoy::SearchFilter::from_str(f).unwrap())
+            Some(args) => args
+                .map(|f| shadertoy::SearchFilter::from_str(f).unwrap())
                 .collect(),
             None => vec![],
         },
@@ -275,7 +276,8 @@ fn download(
                 write_file(&glsl_path, full_source.as_bytes())?;
 
                 // we currently only support single-pass image shaders, with no inputs
-                if pass.pass_type == "image" && pass.inputs.is_empty()
+                if pass.pass_type == "image"
+                    && pass.inputs.is_empty()
                     && shader.renderpass.len() == 1
                 {
                     // these shaders get stuck in forever compilation, so let's skip them forn ow

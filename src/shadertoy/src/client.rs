@@ -151,7 +151,8 @@ impl Client {
 
     /// Retrives a shader given an id.
     pub fn get_shader(&self, shader_id: &str) -> Result<Shader> {
-        let json_str = self.rest_client
+        let json_str = self
+            .rest_client
             .get(&format!(
                 "https://www.shadertoy.com/api/v1/shaders/{}?key={}",
                 shader_id, self.api_key
