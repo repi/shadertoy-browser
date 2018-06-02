@@ -3,8 +3,10 @@ language: rust
 cache: cargo
 rust:
   - stable
+  - nightly
 os:
   - osx
+  - linux
 script:
   - cargo test --all
   - cargo run -- --search car --headless --verbose
