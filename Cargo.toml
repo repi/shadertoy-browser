@@ -8,6 +8,7 @@ readme = "README.md"
 license = "MIT/Apache-2.0"
 keywords = ["shaders", "shadertoy", "render", "mac", "metal"]
 categories = ["rendering"]
+exclude = ["screenshots/*"]
 
 [badges]
 travis-ci = { repository = "repi/shadertoy-browser" }
