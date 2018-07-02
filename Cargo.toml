@@ -38,7 +38,7 @@ error-chain = "0.12.0"
 open = "1.2.1"
 indicatif = "0.9.0"
 thread_profiler = "0.3.0"
-log = "0.4.1"
+log = "0.4.3"
 fern = "0.5.6"
 sha3 = "0.7.3"
 
