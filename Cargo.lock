@@ -881,7 +881,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "libc 0.2.42 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "smallvec 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "smallvec 0.6.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "winapi 0.3.4 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -1038,7 +1038,7 @@ dependencies = [
 
 [[package]]
 name = "reqwest"
-version = "0.8.6"
+version = "0.8.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "bytes 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1183,7 +1183,7 @@ name = "shadertoy"
 version = "0.6.1"
 dependencies = [
  "error-chain 0.12.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "reqwest 0.8.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "reqwest 0.8.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.69 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_derive 1.0.69 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_json 1.0.19 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1209,7 +1209,7 @@ dependencies = [
  "objc-foundation 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "open 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "rayon 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "reqwest 0.8.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "reqwest 0.8.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "rust-base58 0.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.69 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_json 1.0.19 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1243,8 +1243,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "smallvec"
-version = "0.6.1"
+version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "unreachable 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
 
 [[package]]
 name = "smithay-client-toolkit"
@@ -1897,7 +1900,7 @@ dependencies = [
 "checksum regex-syntax 0.5.6 (registry+https://github.com/rust-lang/crates.io-index)" = "7d707a4fa2637f2dca2ef9fd02225ec7661fe01a53623c1e6515b6916511f7a7"
 "checksum relay 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "1576e382688d7e9deecea24417e350d3062d97e32e45d70b1cde65994ff1489a"
 "checksum remove_dir_all 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)" = "3488ba1b9a2084d38645c4c08276a1752dcbf2c7130d74f1569681ad5d2799c5"
-"checksum reqwest 0.8.6 (registry+https://github.com/rust-lang/crates.io-index)" = "2abe46f8e00792693a2488e296c593d1f4ea39bb1178cfce081d6793657575e4"
+"checksum reqwest 0.8.7 (registry+https://github.com/rust-lang/crates.io-index)" = "e7e237e32c3bfa55c95e29af872c8f481471d70b8a5ec15d85f4d274ffd92dd9"
 "checksum rust-base58 0.0.4 (registry+https://github.com/rust-lang/crates.io-index)" = "b313b91fcdc6719ad41fa2dad2b7e810b03833fae4bf911950e15529a5f04439"
 "checksum rustc-demangle 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)" = "76d7ba1feafada44f2d38eed812bd2489a03c0f5abb975799251518b68848649"
 "checksum rustc-serialize 0.3.24 (registry+https://github.com/rust-lang/crates.io-index)" = "dcf128d1287d2ea9d80910b5f1120d0b8eede3fbf1abe91c40d39ea7d51e6fda"
@@ -1917,7 +1920,7 @@ dependencies = [
 "checksum slab 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "17b4fcaed89ab08ef143da37bc52adbcc04d4a69014f4c1208d6b51f0c47bc23"
 "checksum slab 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "fdeff4cd9ecff59ec7e3744cbca73dfe5ac35c2aedb2cfba8a1c715a18912e9d"
 "checksum smallvec 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "4c8cbcd6df1e117c2210e13ab5109635ad68a929fcbb8964dc965b76cb5ee013"
-"checksum smallvec 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)" = "03dab98ab5ded3a8b43b2c80751194608d0b2aa0f1d46cf95d1c35e192844aa7"
+"checksum smallvec 0.6.3 (registry+https://github.com/rust-lang/crates.io-index)" = "26df3bb03ca5eac2e64192b723d51f56c1b1e0860e7c766281f4598f181acdc8"
 "checksum smithay-client-toolkit 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "92dd41b4a4a0679e5873f8e58b8191554d4dc0104d32a22ff09b678059327bd2"
 "checksum spirv_cross 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)" = "1af833c4f35713d2d739de6e8a2a05614b25800fd48d07d98ca3a143a1df6ce1"
 "checksum stable_deref_trait 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = "15132e0e364248108c5e2c02e3ab539be8d6f5d52a01ca9bbf27ed657316f02b"
