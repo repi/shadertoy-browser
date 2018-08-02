@@ -23,7 +23,7 @@ members = [
 shadertoy = { path = "src/shadertoy", version = "0.6.1" }
 floating-duration = "0.1.2"
 chrono = "0.4.5"
-rayon = "1.0.1"
+rayon = "1.0.2"
 clap = "2.32.0"
 shaderc = "0.3.6"
 serde = "1.0.69"
