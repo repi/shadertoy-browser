@@ -1171,7 +1171,7 @@ dependencies = [
 
 [[package]]
 name = "shaderc"
-version = "0.3.6"
+version = "0.3.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "cmake 0.1.31 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1214,7 +1214,7 @@ dependencies = [
  "serde 1.0.69 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_json 1.0.19 (registry+https://github.com/rust-lang/crates.io-index)",
  "sha3 0.7.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "shaderc 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "shaderc 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "shadertoy 0.6.1",
  "spirv_cross 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "thread_profiler 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1915,7 +1915,7 @@ dependencies = [
 "checksum serde_json 1.0.19 (registry+https://github.com/rust-lang/crates.io-index)" = "93aee34bb692dde91e602871bc792dd319e489c7308cdbbe5f27cf27c64280f5"
 "checksum serde_urlencoded 0.5.2 (registry+https://github.com/rust-lang/crates.io-index)" = "e703cef904312097cfceab9ce131ff6bbe09e8c964a0703345a5f49238757bc1"
 "checksum sha3 0.7.3 (registry+https://github.com/rust-lang/crates.io-index)" = "b64dcef59ed4290b9fb562b53df07f564690d6539e8ecdd4728cf392477530bc"
-"checksum shaderc 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)" = "1d0973a003d29bd5fcc38986114c1c36b445f16616ac27a4ac4e65e5d30acf99"
+"checksum shaderc 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)" = "7a9d65e595a14613e0be0e4096ccea816e32e71697f189429dd846d1a4771cae"
 "checksum siphasher 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "0df90a788073e8d0235a67e50441d47db7c8ad9debd91cbf43736a2a92d36537"
 "checksum slab 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "17b4fcaed89ab08ef143da37bc52adbcc04d4a69014f4c1208d6b51f0c47bc23"
 "checksum slab 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "fdeff4cd9ecff59ec7e3744cbca73dfe5ac35c2aedb2cfba8a1c715a18912e9d"
