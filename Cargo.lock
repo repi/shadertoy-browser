@@ -187,7 +187,21 @@ dependencies = [
  "block 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "core-graphics 0.14.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.42 (registry+https://github.com/rust-lang/crates.io-index)",
- "objc 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "objc 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "cocoa"
+version = "0.18.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "bitflags 1.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "block 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "core-foundation 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "core-graphics 0.17.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "foreign-types 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "libc 0.2.42 (registry+https://github.com/rust-lang/crates.io-index)",
+ "objc 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -247,6 +261,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "core-graphics"
 version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "bitflags 1.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "core-foundation 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "foreign-types 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "libc 0.2.42 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "core-graphics"
+version = "0.17.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "bitflags 1.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -628,17 +653,18 @@ version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
-name = "metal-rs"
-version = "0.9.3"
+name = "metal"
+version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "bitflags 1.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "block 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "cocoa 0.15.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "cocoa 0.18.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "core-graphics 0.17.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "foreign-types 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.42 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "objc 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "objc 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "objc-foundation 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "objc_id 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -796,7 +822,7 @@ dependencies = [
 
 [[package]]
 name = "objc"
-version = "0.2.2"
+version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "malloc_buf 0.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -809,7 +835,7 @@ version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "block 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "objc 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "objc 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "objc_id 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -826,7 +852,7 @@ name = "objc_id"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "objc 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "objc 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -1197,6 +1223,7 @@ dependencies = [
  "clap 2.32.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "cocoa 0.15.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "colored 1.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "core-graphics 0.17.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "error-chain 0.12.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "fern 0.5.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "floating-duration 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1204,8 +1231,8 @@ dependencies = [
  "indicatif 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.42 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "metal-rs 0.9.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "objc 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "metal 0.13.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "objc 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "objc-foundation 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "open 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "rayon 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1740,7 +1767,7 @@ dependencies = [
  "core-graphics 0.14.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazy_static 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.42 (registry+https://github.com/rust-lang/crates.io-index)",
- "objc 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "objc 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "parking_lot 0.5.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "percent-encoding 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "smithay-client-toolkit 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1802,6 +1829,7 @@ dependencies = [
 "checksum clicolors-control 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "1f84dec9bc083ce2503908cd305af98bd363da6f54bf8d4bf0ac14ee749ad5d1"
 "checksum cmake 0.1.31 (registry+https://github.com/rust-lang/crates.io-index)" = "95470235c31c726d72bf2e1f421adc1e65b9d561bf5529612cbe1a72da1467b3"
 "checksum cocoa 0.15.0 (registry+https://github.com/rust-lang/crates.io-index)" = "7b44bd25bd275e9d74a5dff8ca55f2fb66c9ad5e12170d58697701df21a56e0e"
+"checksum cocoa 0.18.1 (registry+https://github.com/rust-lang/crates.io-index)" = "3afda30c4d94c3597775891170fc02cae71ed7add6c6f497cc391f6272c62d8a"
 "checksum colored 1.6.0 (registry+https://github.com/rust-lang/crates.io-index)" = "b0aa3473e85a3161b59845d6096b289bb577874cafeaf75ea1b1beaa6572c7fc"
 "checksum console 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)" = "7649ca90478264b9686aac8d269fcb014f14c2bed7c79a7e51b9f6afd4d783eb"
 "checksum core-foundation 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)" = "25bfd746d203017f7d5cbd31ee5d8e17f94b6521c7af77ece6c9e4b2d4b16c67"
@@ -1809,6 +1837,7 @@ dependencies = [
 "checksum core-foundation-sys 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)" = "065a5d7ffdcbc8fa145d6f0746f3555025b9097a9e9cda59f7467abae670c78d"
 "checksum core-foundation-sys 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)" = "b2a53cce0ddcf7e7e1f998738d757d5a3bf08bf799a180e50ebe50d298f52f5a"
 "checksum core-graphics 0.14.0 (registry+https://github.com/rust-lang/crates.io-index)" = "e54c4ab33705fa1fc8af375bb7929d68e1c1546c1ecef408966d8c3e49a1d84a"
+"checksum core-graphics 0.17.2 (registry+https://github.com/rust-lang/crates.io-index)" = "46a1b26242df9c08350ffede6684753773eab42289745f618fc42c2f41486ffa"
 "checksum crc 1.8.1 (registry+https://github.com/rust-lang/crates.io-index)" = "d663548de7f5cca343f1e0a48d14dcfb0e9eb4e079ec58883b7251539fa10aeb"
 "checksum crossbeam-deque 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "f739f8c5363aca78cfb059edf753d8f0d36908c348f3d8d1503f03d8b75d9cf3"
 "checksum crossbeam-deque 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)" = "fe8153ef04a7594ded05b427ffad46ddeaf22e63fd48d42b3e1e3bb4db07cae7"
@@ -1856,7 +1885,7 @@ dependencies = [
 "checksum memchr 2.0.1 (registry+https://github.com/rust-lang/crates.io-index)" = "796fba70e76612589ed2ce7f45282f5af869e0fdd7cc6199fa1aa1f1d591ba9d"
 "checksum memmap 0.6.2 (registry+https://github.com/rust-lang/crates.io-index)" = "e2ffa2c986de11a9df78620c01eeaaf27d94d3ff02bf81bfcca953102dd0c6ff"
 "checksum memoffset 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "0f9dc261e2b62d7a622bf416ea3c5245cdd5d9a7fcc428c0d06804dfce1775b3"
-"checksum metal-rs 0.9.3 (registry+https://github.com/rust-lang/crates.io-index)" = "756654c44e8b85ba7d79497c887ff7a48d1f269c7bc09c9484f95092f54fbf6a"
+"checksum metal 0.13.0 (registry+https://github.com/rust-lang/crates.io-index)" = "8411e1b14691a658f4b285f980c98d1af1922dcf037ea4454288dc456ca0d1ed"
 "checksum mime 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)" = "0b28683d0b09bbc20be1c9b3f6f24854efb1356ffcffee08ea3f6e65596e85fa"
 "checksum mime_guess 2.0.0-alpha.4 (registry+https://github.com/rust-lang/crates.io-index)" = "130ea3c9c1b65dba905ab5a4d9ac59234a9585c24d135f264e187fe7336febbd"
 "checksum mio 0.6.14 (registry+https://github.com/rust-lang/crates.io-index)" = "6d771e3ef92d58a8da8df7d6976bfca9371ed1de6619d9d5a5ce5b1f29b85bfe"
@@ -1872,7 +1901,7 @@ dependencies = [
 "checksum num-rational 0.1.42 (registry+https://github.com/rust-lang/crates.io-index)" = "ee314c74bd753fc86b4780aa9475da469155f3848473a261d2d18e35245a784e"
 "checksum num-traits 0.2.4 (registry+https://github.com/rust-lang/crates.io-index)" = "775393e285254d2f5004596d69bb8bc1149754570dcc08cf30cabeba67955e28"
 "checksum num_cpus 1.8.0 (registry+https://github.com/rust-lang/crates.io-index)" = "c51a3322e4bca9d212ad9a158a02abc6934d005490c054a2778df73a70aa0a30"
-"checksum objc 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "877f30f37acef6749b1841cceab289707f211aecfc756553cd63976190e6cc2e"
+"checksum objc 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)" = "9833ab0efe5361b1e2122a0544a5d3359576911a42cb098c2e59be8650807367"
 "checksum objc-foundation 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "1add1b659e36c9607c7aab864a76c7a4c2760cd0cd2e120f3fb8b952c7e22bf9"
 "checksum objc_exception 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "098cd29a2fa3c230d3463ae069cecccc3fdfd64c0d2496ab5b96f82dab6a00dc"
 "checksum objc_id 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "e4730aa1c64d722db45f7ccc4113a3e2c465d018de6db4d3e7dfe031e8c8a297"

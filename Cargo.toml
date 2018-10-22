@@ -46,8 +46,9 @@ sha3 = "0.7.3"
 cocoa = "0.15.0"
 objc = "0.2.2"
 objc-foundation = "0.1.1"
-metal-rs = "0.9.3"
+metal = "0.13.0"
 spirv_cross = "0.9.0"
+core-graphics = "0.17.2"
 
 [profile.release]
 debug = true

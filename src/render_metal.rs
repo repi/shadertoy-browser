@@ -1,11 +1,12 @@
 extern crate cocoa;
 extern crate foreign_types;
 extern crate libc;
-extern crate metal_rs as metal;
+extern crate metal;
 extern crate objc_foundation;
 extern crate shaderc;
 extern crate spirv_cross;
 extern crate winit;
+extern crate core_graphics;
 
 use std::any::Any;
 use std::mem;
@@ -17,9 +18,9 @@ use std::cell::RefCell;
 use std::ffi::CStr;
 use std::sync::Mutex;
 
+use render_metal::core_graphics::geometry::CGSize;
 use cocoa::appkit::{NSView, NSWindow};
 use cocoa::base::id as cocoa_id;
-use cocoa::foundation::NSSize;
 use winit::os::macos::WindowExt;
 
 use chrono::prelude::*;
@@ -185,7 +186,7 @@ impl RenderBackend for MetalRenderBackend {
         }
 
         let draw_size = winit_window.get_inner_size().unwrap();
-        layer.set_drawable_size(NSSize::new(draw_size.0.into(), draw_size.1.into()));
+        layer.set_drawable_size(CGSize::new(draw_size.0.into(), draw_size.1.into()));
 
         self.layer = Some(layer);
 
