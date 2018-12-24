@@ -11,6 +11,10 @@ jobs:
       nightly:
         rustup_toolchain: nightly
   steps:
+  - ${{ if eq(parameters.name, 'Linux') }}:
+    - script: |
+        sudo apt-get install openssl
+      displayName: Install dependencies
   # Linux and macOS.
   - ${{ if ne(parameters.name, 'Windows') }}:
     - script: |
