@@ -13,7 +13,7 @@ jobs:
   steps:
   - ${{ if eq(parameters.name, 'Linux') }}:
     - script: |
-        sudo apt-get install openssl
+        sudo apt-get install pkg-config libssl-dev
       displayName: Install dependencies
   # Linux and macOS.
   - ${{ if ne(parameters.name, 'Windows') }}:
