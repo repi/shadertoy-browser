@@ -61,7 +61,7 @@ extern crate cocoa;
 use cocoa::foundation::NSAutoreleasePool;
 
 mod errors {
-    error_chain!{
+    error_chain! {
         links {
             Shadertoy(::shadertoy::Error, ::shadertoy::ErrorKind);
         }
@@ -546,11 +546,13 @@ fn run() -> Result<()> {
                 message
             ))
         })
-        .chain(std::fs::OpenOptions::new()
-            .write(true)
-            .create(true)
-            .append(false)
-            .open("output.log")?)
+        .chain(
+            std::fs::OpenOptions::new()
+                .write(true)
+                .create(true)
+                .append(false)
+                .open("output.log")?,
+        )
         .apply()?;
 
     // setup renderer
@@ -717,11 +719,11 @@ fn run() -> Result<()> {
                             }
                         }
                         // this panics on Mac as "not yet implemented"
-                    /*
-                        Some(winit::VirtualKeyCode::F) => {
-                            window.set_fullscreen(None);
-                        }
-                    */
+                        /*
+                            Some(winit::VirtualKeyCode::F) => {
+                                window.set_fullscreen(None);
+                            }
+                        */
                         // manual workaround for CMD-Q on Mac not quitting the app
                         // issue tracked in https://github.com/tomaka/winit/issues/41
                         Some(winit::VirtualKeyCode::Q) => {

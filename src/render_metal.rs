@@ -1,4 +1,5 @@
 extern crate cocoa;
+extern crate core_graphics;
 extern crate foreign_types;
 extern crate libc;
 extern crate metal;
@@ -6,7 +7,6 @@ extern crate objc_foundation;
 extern crate shaderc;
 extern crate spirv_cross;
 extern crate winit;
-extern crate core_graphics;
 
 use std::any::Any;
 use std::mem;
@@ -18,9 +18,9 @@ use std::cell::RefCell;
 use std::ffi::CStr;
 use std::sync::Mutex;
 
-use render_metal::core_graphics::geometry::CGSize;
 use cocoa::appkit::{NSView, NSWindow};
 use cocoa::base::id as cocoa_id;
+use render_metal::core_graphics::geometry::CGSize;
 use winit::os::macos::WindowExt;
 
 use chrono::prelude::*;
@@ -118,7 +118,8 @@ impl MetalRenderBackend {
                         return Err(format!(
                             "Metal shader compiler failed: {}",
                             String::from_utf8_lossy(&p.stderr)
-                        ).into());
+                        )
+                        .into());
                     }
 
                     let p = {
@@ -133,7 +134,8 @@ impl MetalRenderBackend {
                         return Err(format!(
                             "Metal library compiler failed: {}",
                             String::from_utf8_lossy(&p.stderr)
-                        ).into());
+                        )
+                        .into());
                     }
                 } else {
                     info!("Metal library cached for {}", shader_path);
@@ -410,7 +412,7 @@ fn new_render_pipeline_state(
     descriptor: &metal::RenderPipelineDescriptorRef,
 ) -> Result<metal::RenderPipelineState> {
     unsafe {
-        let pipeline_state: *mut metal::MTLRenderPipelineState = try_objc!{ err =>
+        let pipeline_state: *mut metal::MTLRenderPipelineState = try_objc! { err =>
             msg_send![*device, newRenderPipelineStateWithDescriptor:descriptor
                                                             error:&mut err]
         };
