@@ -105,9 +105,10 @@ impl Client {
     pub fn search(&self, params: &SearchParams) -> Result<Vec<String>> {
         let query_str = format!(
             "https://www.shadertoy.com/api/v1/shaders{}?sort={}&{}key={}",
-            match params.string.is_empty() {
-                false => format!("/query/{}", params.string),
-                true => String::from(""),
+            if params.string.is_empty() {
+                "".to_string()
+            } else {
+                format!("/query/{}", params.string)
             },
             format!("{:?}", params.sort_order).to_lowercase(),
             params
