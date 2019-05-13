@@ -1,6 +1,6 @@
 use std::any::Any;
 
-use errors::*;
+use crate::errors::*;
 
 #[repr(C)]
 #[allow(non_snake_case)]
@@ -50,8 +50,8 @@ pub struct RenderParams<'a> {
 }
 
 pub trait RenderBackend: Sync {
-    fn init_window(&mut self, window: &Any);
-    fn render_frame(&mut self, params: RenderParams);
+    fn init_window(&mut self, window: &dyn Any);
+    fn render_frame(&mut self, params: RenderParams<'_>);
 
     fn new_pipeline(&self, shader_path: &str, shader_source: &str) -> Result<RenderPipelineHandle>;
 }

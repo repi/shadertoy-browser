@@ -5,6 +5,8 @@
 //! The API queries are done through the [`shadertoy`](https://crates.io/crates/shadertoy) crate, which can be found in  `src/shadertoy`
 
 #![allow(dead_code)]
+#![warn(clippy::all)]
+#![warn(rust_2018_idioms)]
 #![recursion_limit = "1024"] // `error_chain!` can recurse deeply
 
 #[macro_use]
@@ -16,26 +18,12 @@ extern crate thread_profiler;
 #[macro_use]
 extern crate log;
 
-extern crate chrono;
-extern crate colored;
-extern crate fern;
-extern crate floating_duration;
-extern crate indicatif;
-extern crate open;
-extern crate rayon;
-extern crate reqwest;
-extern crate rust_base58 as base58;
-extern crate serde_json;
-extern crate sha3;
-extern crate shadertoy;
-extern crate winit;
-
-use base58::ToBase58;
 use clap::{App, Arg};
 use colored::*;
 use floating_duration::TimeAsFloat;
 use indicatif::{ProgressBar, ProgressStyle};
 use rayon::prelude::*;
+use rust_base58::ToBase58;
 use sha3::{Digest as Sha3Digest, Sha3_256};
 use std::fs::File;
 use std::io::prelude::*;
@@ -96,7 +84,7 @@ fn write_file<P: AsRef<Path>>(path: P, buf: &[u8]) -> Result<()> {
     Ok(())
 }
 
-fn search(client: &shadertoy::Client, matches: &clap::ArgMatches) -> Result<Vec<String>> {
+fn search(client: &shadertoy::Client, matches: &clap::ArgMatches<'_>) -> Result<Vec<String>> {
     profile_scope!("search");
 
     use std::str::FromStr;
@@ -150,8 +138,8 @@ fn search(client: &shadertoy::Client, matches: &clap::ArgMatches) -> Result<Vec<
 }
 
 fn download(
-    matches: &clap::ArgMatches,
-    render_backend: &Option<Box<RenderBackend>>,
+    matches: &clap::ArgMatches<'_>,
+    render_backend: &Option<Box<dyn RenderBackend>>,
 ) -> Result<Vec<BuiltShadertoy>> {
     profile_scope!("download");
 
@@ -557,7 +545,7 @@ fn run() -> Result<()> {
 
     // setup renderer
 
-    let render_backend: Option<Box<RenderBackend>>;
+    let render_backend: Option<Box<dyn RenderBackend>>;
 
     #[cfg(target_os = "macos")]
     {

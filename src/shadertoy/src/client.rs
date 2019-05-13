@@ -1,9 +1,9 @@
-use errors::*;
+use crate::errors::*;
+use crate::types::*;
 use reqwest;
 use serde_json;
 use std;
 use std::str::FromStr;
-use types::*;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Copy, Clone)]
 pub enum SearchSortOrder {
@@ -102,7 +102,7 @@ impl Client {
     /// }
     /// # }
     /// ```
-    pub fn search(&self, params: &SearchParams) -> Result<Vec<String>> {
+    pub fn search(&self, params: &SearchParams<'_>) -> Result<Vec<String>> {
         let query_str = format!(
             "https://www.shadertoy.com/api/v1/shaders{}?sort={}&{}key={}",
             if params.string.is_empty() {
