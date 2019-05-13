@@ -4,6 +4,7 @@
 [![Build Status](https://travis-ci.org/repi/shadertoy-browser.svg?branch=master)](https://travis-ci.org/repi/shadertoy-browser)
 [![Build Status](https://ci.appveyor.com/api/projects/status/ayr854h0a0eqqrfh/branch/master?svg=true)](https://ci.appveyor.com/project/repi/shadertoy-browser)
 ![MIT/Apache](https://img.shields.io/badge/license-MIT%2FApache-blue.svg)
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Frepi%2Fshadertoy-browser.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Frepi%2Fshadertoy-browser?ref=badge_shield)
 
 Small [Shadertoy](http://shadertoy.com) browser & viewer for Mac built in [Rust](https://www.rust-lang.org).
 
@@ -91,6 +92,9 @@ Licensed under either of the following, at your option:
 
 * Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
 * MIT license ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
+
+
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Frepi%2Fshadertoy-browser.svg?type=large)](https://app.fossa.io/projects/git%2Bgithub.com%2Frepi%2Fshadertoy-browser?ref=badge_large)
 
 ### Contribution
 
