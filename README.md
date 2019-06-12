@@ -28,7 +28,7 @@ $ cd shadertoy-browser
 $ cargo build --release
 
 # this will download and view all shadertoys with "car" in the name
-$ cargo run --release -- -s car 
+$ cargo run --release -- -s car
 ```
 
 ## Usage
@@ -90,9 +90,8 @@ This repo and app is a bit of an experimental Rust test range, and it is not int
 
 Licensed under either of the following, at your option:
 
-* Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
-* MIT license ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
-
+- Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
+- MIT license ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
 
 [![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Frepi%2Fshadertoy-browser.svg?type=large)](https://app.fossa.io/projects/git%2Bgithub.com%2Frepi%2Fshadertoy-browser?ref=badge_large)
 
