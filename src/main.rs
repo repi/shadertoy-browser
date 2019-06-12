@@ -805,7 +805,6 @@ fn run() -> Result<()> {
 fn main() {
     if let Err(ref e) = run() {
         use error_chain::ChainedError;
-        use std::io::Write; // trait which holds `display_chain`
         let stderr = &mut ::std::io::stderr();
         let errmsg = "Error writing to stderr";
 
