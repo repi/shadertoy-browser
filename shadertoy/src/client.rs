@@ -41,7 +41,10 @@ impl std::fmt::Display for IssueError {
 }
 
 impl<'a> SearchQuery<'a> {
-    pub fn issue(&self, client: &reqwest::blocking::Client) -> Result<Vec<String>, IssueError> {
+    pub fn issue_blocking(
+        &self,
+        client: &reqwest::blocking::Client,
+    ) -> Result<Vec<String>, IssueError> {
         let json_str = client
             .get(&self.url())
             .send()
@@ -50,15 +53,39 @@ impl<'a> SearchQuery<'a> {
             .map_err(IssueError::Http)?;
         Self::process_response(&json_str).map_err(|e| e.into())
     }
+
+    pub async fn issue(&self, client: &reqwest::Client) -> Result<Vec<String>, IssueError> {
+        let json_str = client
+            .get(&self.url())
+            .send()
+            .await
+            .map_err(IssueError::Http)?
+            .text()
+            .await
+            .map_err(IssueError::Http)?;
+        Self::process_response(&json_str).map_err(|e| e.into())
+    }
 }
 
 impl<'a> ShaderQuery<'a> {
-    pub fn issue(&self, client: &reqwest::blocking::Client) -> Result<Shader, IssueError> {
+    pub fn issue_blocking(&self, client: &reqwest::blocking::Client) -> Result<Shader, IssueError> {
         let json_str = client
             .get(&self.url())
             .send()
             .map_err(IssueError::Http)?
             .text()
+            .map_err(IssueError::Http)?;
+        Self::process_response(&json_str).map_err(|e| e.into())
+    }
+
+    pub async fn issue(&self, client: &reqwest::Client) -> Result<Shader, IssueError> {
+        let json_str = client
+            .get(&self.url())
+            .send()
+            .await
+            .map_err(IssueError::Http)?
+            .text()
+            .await
             .map_err(IssueError::Http)?;
         Self::process_response(&json_str).map_err(|e| e.into())
     }

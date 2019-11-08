@@ -13,7 +13,7 @@ fn test_query() {
         filters: vec![shadertoy::SearchFilter::MultiPass],
         api_key,
     }
-    .issue(&client)
+    .issue_blocking(&client)
     .unwrap();
 
     assert!(!query.is_empty());
@@ -23,7 +23,7 @@ fn test_query() {
         shader_id: &query[0],
         api_key,
     }
-    .issue(&client)
+    .issue_blocking(&client)
     .unwrap();
     assert!(!shader.renderpass.is_empty());
 
@@ -32,7 +32,7 @@ fn test_query() {
         shader_id: "4d2BDy",
         api_key,
     }
-    .issue(&client);
+    .issue_blocking(&client);
     assert!(shader.is_ok());
 
     // try getting a random shader, this should fail
@@ -40,7 +40,7 @@ fn test_query() {
         shader_id: "doesnt_exist",
         api_key,
     }
-    .issue(&client);
+    .issue_blocking(&client);
     assert!(shader.is_err());
 }
 
@@ -54,7 +54,7 @@ fn test_invalid_api_key() {
         shader_id: "4d2BDy",
         api_key,
     }
-    .issue(&client);
+    .issue_blocking(&client);
 
     assert!(shader.is_err());
     println!("error: {}", shader.err().unwrap());
