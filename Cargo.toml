@@ -17,11 +17,11 @@ appveyor = { repository = "repi/shadertoy-browser" }
 
 [workspace]
 members = [
-    "src/shadertoy"
+    "shadertoy"
 ]
 
 [dependencies]
-shadertoy = { path = "src/shadertoy", version = "0.6.1" }
+shadertoy = { path = "shadertoy", version = "0.6.1" }
 floating-duration = "0.1.2"
 chrono = "0.4.9"
 rayon = "1.2.0"
