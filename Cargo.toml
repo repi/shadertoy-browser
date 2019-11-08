@@ -11,10 +11,6 @@ categories = ["rendering"]
 exclude = ["screenshots/*"]
 edition = "2018"
 
-[badges]
-travis-ci = { repository = "repi/shadertoy-browser" }
-appveyor = { repository = "repi/shadertoy-browser" }
-
 [workspace]
 members = [
     "src/shadertoy"
