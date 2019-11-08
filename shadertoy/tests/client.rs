@@ -3,7 +3,7 @@ extern crate shadertoy;
 #[test]
 fn test_query() {
     let api_key = "Bd8tWD";
-    let client = reqwest::Client::new();
+    let client = reqwest::blocking::Client::new();
 
     // try connecting to shadertoy.com and search for all "car" shadertoys
     // this of course requires one to be online
@@ -47,7 +47,7 @@ fn test_query() {
 #[test]
 fn test_invalid_api_key() {
     let api_key = "incorrect";
-    let client = reqwest::Client::new();
+    let client = reqwest::blocking::Client::new();
 
     // try getting a specific shader, this should fail due to the API key
     let shader = shadertoy::ShaderQuery {

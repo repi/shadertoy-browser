@@ -41,7 +41,7 @@ impl std::fmt::Display for IssueError {
 }
 
 impl<'a> SearchQuery<'a> {
-    pub fn issue(&self, client: &reqwest::Client) -> Result<Vec<String>, IssueError> {
+    pub fn issue(&self, client: &reqwest::blocking::Client) -> Result<Vec<String>, IssueError> {
         let json_str = client
             .get(&self.url())
             .send()
@@ -53,7 +53,7 @@ impl<'a> SearchQuery<'a> {
 }
 
 impl<'a> ShaderQuery<'a> {
-    pub fn issue(&self, client: &reqwest::Client) -> Result<Shader, IssueError> {
+    pub fn issue(&self, client: &reqwest::blocking::Client) -> Result<Shader, IssueError> {
         let json_str = client
             .get(&self.url())
             .send()

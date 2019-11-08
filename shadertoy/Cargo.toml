@@ -17,7 +17,7 @@ appveyor = { repository = "repi/shadertoy-browser" }
 [dependencies]
 serde = { version = "1.0.82", features = ["derive"] }
 serde_json = "1.0.33"
-reqwest = { version = "0.9.5", optional = true }
+reqwest = { version = "0.10.0-alpha.1", optional = true, features = ["blocking"] }
 
 [features]
 default = []
