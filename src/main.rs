@@ -593,18 +593,18 @@ fn run() -> Result<()> {
 
     let mut events_loop = winit::EventsLoop::new();
     let window = winit::WindowBuilder::new()
-        .with_dimensions(
+        .with_dimensions(winit::dpi::LogicalSize::new(
             matches
                 .value_of("res_width")
                 .unwrap()
-                .parse::<u32>()
+                .parse::<f64>()
                 .unwrap(),
             matches
                 .value_of("res_height")
                 .unwrap()
-                .parse::<u32>()
+                .parse::<f64>()
                 .unwrap(),
-        )
+        ))
         .with_title("Shadertoy Browser".to_string())
         .build(&events_loop)
         .chain_err(|| "error creating window")?;
@@ -656,9 +656,11 @@ fn run() -> Result<()> {
                 event: winit::WindowEvent::CursorMoved { position, .. },
                 ..
             } => {
-                mouse_pos = position;
+                let physical_pos = position.to_physical(window.get_hidpi_factor());
+                let physical_pos = (physical_pos.x, physical_pos.y);
+                mouse_pos = physical_pos;
                 if mouse_lmb_pressed {
-                    mouse_pressed_pos = position;
+                    mouse_pressed_pos = physical_pos;
                 }
             }
             winit::Event::WindowEvent {
@@ -791,10 +793,9 @@ fn run() -> Result<()> {
             mouse_click_pos,
             quads: &quads,
         });
-
         #[cfg(target_os = "macos")]
         unsafe {
-            msg_send![pool, release];
+            //            msg_send![pool, release];
             pool = NSAutoreleasePool::new(cocoa::base::nil);
         }
     }

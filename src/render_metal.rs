@@ -1,39 +1,32 @@
-extern crate cocoa;
-extern crate core_graphics;
-extern crate foreign_types;
-extern crate libc;
-extern crate metal;
-extern crate objc_foundation;
-extern crate shaderc;
-extern crate spirv_cross;
-extern crate winit;
+use cocoa;
+use core_graphics;
+use foreign_types;
+use libc;
+use metal;
+use shaderc;
+use spirv_cross;
+use winit;
 
-use std::any::Any;
-use std::mem;
-use std::time::Instant;
-
-use self::foreign_types::ForeignType;
-use objc::runtime::{Object, YES};
-use std::cell::RefCell;
-use std::ffi::CStr;
-use std::sync::Mutex;
-
+use crate::errors::*;
+use crate::render::*;
+use crate::render_metal::core_graphics::geometry::CGSize;
+use chrono::prelude::*;
 use cocoa::appkit::{NSView, NSWindow};
 use cocoa::base::id as cocoa_id;
-use render_metal::core_graphics::geometry::CGSize;
-use winit::os::macos::WindowExt;
-
-use chrono::prelude::*;
 use floating_duration::TimeAsFloat;
-
-use std;
+use foreign_types::ForeignType;
+use objc::runtime::{Object, YES};
+use std::any::Any;
+use std::cell::RefCell;
+use std::ffi::CStr;
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::Write;
+use std::mem;
 use std::path::{Path, PathBuf};
-
-use errors::*;
-use render::*;
+use std::sync::Mutex;
+use std::time::Instant;
+use winit::os::macos::WindowExt;
 
 struct MetalRenderPipeline {
     pipeline_state: metal::RenderPipelineState,
@@ -60,7 +53,7 @@ unsafe impl Sync for MetalRenderBackend {}
 
 impl MetalRenderBackend {
     pub fn new() -> Result<MetalRenderBackend> {
-        let device = metal::Device::system_default();
+        let device = metal::Device::system_default().unwrap();
         let command_queue = device.new_command_queue();
 
         // compile the vertex shader,
@@ -170,7 +163,7 @@ impl MetalRenderBackend {
 }
 
 impl RenderBackend for MetalRenderBackend {
-    fn init_window(&mut self, window: &Any) {
+    fn init_window(&mut self, window: &dyn Any) {
         let winit_window = window.downcast_ref::<winit::Window>().unwrap();
 
         let cocoa_window: cocoa_id = unsafe { mem::transmute(winit_window.get_nswindow()) };
@@ -188,14 +181,14 @@ impl RenderBackend for MetalRenderBackend {
         }
 
         let draw_size = winit_window.get_inner_size().unwrap();
-        layer.set_drawable_size(CGSize::new(draw_size.0.into(), draw_size.1.into()));
+        layer.set_drawable_size(CGSize::new(draw_size.width.into(), draw_size.height.into()));
 
         self.layer = Some(layer);
 
-        self.dpi_factor = winit_window.hidpi_factor();
+        self.dpi_factor = winit_window.get_hidpi_factor() as f32;
     }
 
-    fn render_frame(&mut self, params: RenderParams) {
+    fn render_frame(&mut self, params: RenderParams<'_>) {
         if let Some(ref layer) = self.layer {
             if let Some(drawable) = layer.next_drawable() {
                 let render_pass_descriptor = metal::RenderPassDescriptor::new();
