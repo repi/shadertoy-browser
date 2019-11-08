@@ -1,0 +1,72 @@
+on: [push, pull_request]
+
+name: CI
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+        with:
+          submodules: true
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      # make sure all code has been formatted with rustfmt
+      - run: rustup component add rustfmt
+      - name: check rustfmt
+        uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: -- --check --color always
+
+      # run clippy to verify we have no warnings
+      - run: rustup component add clippy
+      - name: cargo clippy
+        uses: actions-rs/cargo@v1
+        with:
+          command: clippy
+          args: --lib --tests -- -D warnings
+      - name: cargo clippy (all features)
+        uses: actions-rs/cargo@v1
+        with:
+          command: clippy
+          args: --lib --tests --all-features -- -D warnings
+
+  test:
+    name: Test
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macOS-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v1
+        with:
+          submodules: true
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      # test default features
+      - name: test
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --all
+
+      # test all features
+      - name: test (all features)
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --all-features
+
+      # run a query
+      - name: run
+        uses: actions-rs/cargo@v1
+        with:
+          command: run
+          args: -- --search car --headless --verbose
