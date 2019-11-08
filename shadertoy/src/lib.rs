@@ -3,13 +3,13 @@
 #![warn(clippy::all)]
 #![warn(rust_2018_idioms)]
 
-#[macro_use]
-extern crate error_chain;
-
-mod client;
-mod errors;
+mod query;
 mod types;
 
-pub use client::*;
-pub use errors::*;
+pub use query::*;
 pub use types::*;
+
+#[cfg(feature = "client")]
+mod client;
+#[cfg(feature = "client")]
+pub use client::*;
