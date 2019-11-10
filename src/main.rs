@@ -782,7 +782,7 @@ fn run() -> Result<(), Error> {
         });
         #[cfg(target_os = "macos")]
         unsafe {
-            //            msg_send![pool, release];
+            let _: f32 = msg_send![pool, release];
             pool = NSAutoreleasePool::new(cocoa::base::nil);
         }
     }
