@@ -65,7 +65,8 @@ fn write_file<P: AsRef<Path>>(path: P, buf: &[u8]) -> Result<(), Error> {
 }
 
 fn search(
-    client: &shadertoy::Client,
+    http_client: &reqwest::blocking::Client,
+    api_key: &str,
     matches: &clap::ArgMatches<'_>,
 ) -> Result<Vec<String>, Error> {
     profile_scope!("search");
@@ -74,7 +75,7 @@ fn search(
 
     // create search parameters
 
-    let search_params = shadertoy::SearchParams {
+    let search_query = shadertoy::SearchQuery {
         string: matches.value_of("search").unwrap_or(""),
 
         sort_order: value_t!(matches, "order", shadertoy::SearchSortOrder)?,
@@ -85,17 +86,17 @@ fn search(
                 .collect(),
             None => vec![],
         },
+
+        api_key: api_key,
     };
 
-    println!("{:?}", search_params);
+    println!("{:?}", search_query);
 
     // check if we can find a cached search on disk
 
     let path = format!(
         "output/query/{}",
-        serde_json::to_string(&search_params)?
-            .as_bytes()
-            .to_base58()
+        serde_json::to_string(&search_query)?.as_bytes().to_base58()
     );
 
     if let Ok(mut file) = File::open(&path) {
@@ -106,8 +107,8 @@ fn search(
         search_result.context("Shader query json deserialization failed")
     } else {
         // issue the actual request
-        match client
-            .search(&search_params)
+        match search_query
+            .issue_blocking(http_client)
             .context("Shadertoy search failed")
         {
             Ok(result) => {
@@ -129,7 +130,7 @@ fn download(
     let time = Instant::now();
 
     let api_key = matches.value_of("apikey").unwrap();
-    let client = shadertoy::Client::new(api_key);
+    let http_client = reqwest::blocking::Client::new();
 
     let pb = ProgressBar::new_spinner();
     pb.set_style(ProgressStyle::default_spinner().template("")); // workaround
@@ -139,7 +140,7 @@ fn download(
         ProgressStyle::default_spinner().template("{spinner:.green}  Searching{wide_msg}"),
     );
 
-    let shadertoys_found = search(&client, matches)?;
+    let shadertoys_found = search(&http_client, &api_key, matches)?;
     let shadertoys_found_len = shadertoys_found.len();
     let shadertoys_dl_len: i64 = matches.value_of("limit").unwrap().parse().unwrap();
     let shadertoys_len = if shadertoys_dl_len == -1 {
@@ -174,7 +175,11 @@ fn download(
 
             if !path.exists() {
                 profile_scope!("shader_json_query");
-                shader = client.get_shader(shadertoy)?;
+                shader = shadertoy::ShaderQuery {
+                    api_key,
+                    shader_id: shadertoy,
+                }
+                .issue_blocking(&http_client)?;
                 write_file(&path, serde_json::to_string_pretty(&shader)?.as_bytes())?;
             } else {
                 profile_scope!("shader_json_file_load");
@@ -323,8 +328,7 @@ fn download(
                     let path = PathBuf::from(format!("output{}", input.src));
 
                     if !path.exists() {
-                        let mut data_response = client
-                            .rest_client
+                        let mut data_response = http_client
                             .get(&format!("https://www.shadertoy.com/{}", input.src))
                             .send()?;
 

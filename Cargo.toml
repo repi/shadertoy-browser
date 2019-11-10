@@ -21,7 +21,7 @@ members = [
 ]
 
 [dependencies]
-shadertoy = { path = "shadertoy", version = "0.6.1" }
+shadertoy = { path = "shadertoy", version = "0.6.1", features = ["client"] }
 chrono = "0.4.9"
 clap = "2.33.0"
 colored = "1.8.0"
@@ -34,7 +34,7 @@ libc = "0.2.65"
 log = "0.4.8"
 open = "1.3.2"
 rayon = "1.2.0"
-reqwest = "0.9.22"
+reqwest = { version = "0.10.0-alpha.1", features = ["blocking"] }
 rust-base58 = "0.0.4"
 serde = "1.0.102"
 serde_json = "1.0.41"

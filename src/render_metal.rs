@@ -148,7 +148,7 @@ impl MetalRenderBackend {
 
         let ps_function = match ps_library.get_function("main0", None) {
             Ok(func) => func,
-            Err(msg) => bail!("Couldn't get main0 function"),
+            Err(msg) => bail!("Couldn't get main0 function: {}", msg),
         };
 
         let vertex_desc = metal::VertexDescriptor::new();
