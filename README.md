@@ -2,7 +2,7 @@
 
 [![Crate](https://img.shields.io/crates/v/shadertoy-browser.svg)](https://crates.io/crates/shadertoy-browser)
 [![Build Status](https://travis-ci.org/repi/shadertoy-browser.svg?branch=master)](https://travis-ci.org/repi/shadertoy-browser)
-[![Build Status](https://ci.appveyor.com/api/projects/status/ayr854h0a0eqqrfh/branch/master?svg=true)](https://ci.appveyor.com/project/repi/shadertoy-browser)
+shadertoy-browser)
 ![MIT/Apache](https://img.shields.io/badge/license-MIT%2FApache-blue.svg)
 [![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Frepi%2Fshadertoy-browser.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Frepi%2Fshadertoy-browser?ref=badge_shield)
 
