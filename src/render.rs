@@ -1,6 +1,5 @@
+use anyhow::Error;
 use std::any::Any;
-
-use crate::errors::*;
 
 #[repr(C)]
 #[allow(non_snake_case)]
@@ -53,5 +52,9 @@ pub trait RenderBackend: Sync {
     fn init_window(&mut self, window: &dyn Any);
     fn render_frame(&mut self, params: RenderParams<'_>);
 
-    fn new_pipeline(&self, shader_path: &str, shader_source: &str) -> Result<RenderPipelineHandle>;
+    fn new_pipeline(
+        &self,
+        shader_path: &str,
+        shader_source: &str,
+    ) -> Result<RenderPipelineHandle, Error>;
 }
