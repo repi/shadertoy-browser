@@ -1,6 +1,7 @@
 use crate::errors::*;
 use crate::types::*;
 use reqwest;
+use serde::{Deserialize, Serialize};
 use serde_json;
 use std;
 use std::str::FromStr;
