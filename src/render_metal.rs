@@ -7,14 +7,15 @@ use shaderc;
 use spirv_cross;
 use winit;
 
-use crate::errors::*;
 use crate::render::*;
 use crate::render_metal::core_graphics::geometry::CGSize;
+use anyhow::{anyhow, bail, Context, Error};
 use chrono::prelude::*;
 use cocoa::appkit::{NSView, NSWindow};
 use cocoa::base::id as cocoa_id;
 use floating_duration::TimeAsFloat;
 use foreign_types::ForeignType;
+use log::info;
 use objc::runtime::{Object, YES};
 use std::any::Any;
 use std::cell::RefCell;
@@ -52,7 +53,7 @@ pub struct MetalRenderBackend {
 unsafe impl Sync for MetalRenderBackend {}
 
 impl MetalRenderBackend {
-    pub fn new() -> Result<MetalRenderBackend> {
+    pub fn new() -> Result<MetalRenderBackend, Error> {
         let device = metal::Device::system_default().unwrap();
         let command_queue = device.new_command_queue();
 
@@ -62,8 +63,10 @@ impl MetalRenderBackend {
         let compile_options = metal::CompileOptions::new();
         let vs_source = include_str!("shadertoy_vs.metal");
         let vs_library = new_library_with_source(&device, vs_source, &compile_options)
-            .chain_err(|| "failed creating vertex shader")?;
-        let vs_function = vs_library.get_function("vsMain", None)?;
+            .context("Failed creating vertex shader")?;
+        let vs_function = vs_library
+            .get_function("vsMain", None)
+            .map_err(|_| anyhow!("Couldn't find vsMain"))?;
 
         Ok(MetalRenderBackend {
             device,
@@ -82,7 +85,7 @@ impl MetalRenderBackend {
         &self,
         shader_path: &str,
         shader_source: &str,
-    ) -> Result<metal::RenderPipelineState> {
+    ) -> Result<metal::RenderPipelineState, Error> {
         profile_scope!("create_pipeline_state");
 
         let ps_library = {
@@ -108,11 +111,10 @@ impl MetalRenderBackend {
                     };
 
                     if !p.status.success() {
-                        return Err(format!(
+                        bail!(
                             "Metal shader compiler failed: {}",
                             String::from_utf8_lossy(&p.stderr)
-                        )
-                        .into());
+                        );
                     }
 
                     let p = {
@@ -124,18 +126,19 @@ impl MetalRenderBackend {
                     };
 
                     if !p.status.success() {
-                        return Err(format!(
+                        bail!(
                             "Metal library compiler failed: {}",
                             String::from_utf8_lossy(&p.stderr)
-                        )
-                        .into());
+                        );
                     }
                 } else {
                     info!("Metal library cached for {}", shader_path);
                 }
 
                 profile_scope!("new_library_with_file");
-                self.device.new_library_with_file(lib_path)?
+                self.device
+                    .new_library_with_file(lib_path)
+                    .map_err(|_| anyhow!("Failed creating library"))?
             } else {
                 profile_scope!("new_library_with_source");
                 let compile_options = metal::CompileOptions::new();
@@ -143,7 +146,10 @@ impl MetalRenderBackend {
             }
         };
 
-        let ps_function = ps_library.get_function("main0", None)?;
+        let ps_function = match ps_library.get_function("main0", None) {
+            Ok(func) => func,
+            Err(msg) => bail!("Couldn't get main0 function: {}", msg),
+        };
 
         let vertex_desc = metal::VertexDescriptor::new();
 
@@ -307,7 +313,11 @@ impl RenderBackend for MetalRenderBackend {
         }
     }
 
-    fn new_pipeline(&self, shader_path: &str, shader_source: &str) -> Result<RenderPipelineHandle> {
+    fn new_pipeline(
+        &self,
+        shader_path: &str,
+        shader_source: &str,
+    ) -> Result<RenderPipelineHandle, Error> {
         // save out the generated Metal file, for debugging
 
         let metal_path = PathBuf::from(format!("{}.metal", shader_path));
@@ -317,7 +327,7 @@ impl RenderBackend for MetalRenderBackend {
         if let Ok(mut file) = File::open(&metal_path) {
             let mut str = String::new();
             file.read_to_string(&mut str)
-                .chain_err(|| "failed reading metal shader file")?;
+                .context("Failed reading metal shader file")?;
             metal_source = str;
         } else {
             metal_source = convert_glsl_to_metal("unknown name", "main", shader_source)?;
@@ -343,7 +353,7 @@ fn new_library_with_source(
     device: &metal::Device,
     src: &str,
     options: &metal::CompileOptionsRef,
-) -> Result<metal::Library> {
+) -> Result<metal::Library, Error> {
     use cocoa::base::nil as cocoa_nil;
     use cocoa::foundation::NSString as cocoa_NSString;
 
@@ -370,10 +380,10 @@ fn new_library_with_source(
             let message = CStr::from_ptr(compile_error).to_string_lossy().into_owned();
             // original code crashes due to this release when having error message
             //msg_send![err, release];
-            return Err(message.into());
+            return Err(anyhow!(message));
         }
 
-        Err("Unknown metal library failure".into())
+        bail!("Unknown metal library failure")
     }
 }
 
@@ -390,7 +400,7 @@ macro_rules! try_objc {
                 let message = CStr::from_ptr(compile_error).to_string_lossy().into_owned();
                 // original code crashes due to this release when having error message
                 //msg_send![$err_name, release];
-                return Err(message.into());
+                return Err(anyhow!(message));
             }
             value
         }
@@ -403,7 +413,7 @@ macro_rules! try_objc {
 fn new_render_pipeline_state(
     device: &metal::Device,
     descriptor: &metal::RenderPipelineDescriptorRef,
-) -> Result<metal::RenderPipelineState> {
+) -> Result<metal::RenderPipelineState, Error> {
     unsafe {
         let pipeline_state: *mut metal::MTLRenderPipelineState = try_objc! { err =>
             msg_send![*device, newRenderPipelineStateWithDescriptor:descriptor
@@ -413,14 +423,14 @@ fn new_render_pipeline_state(
         // This is the check that is new here
         // apparently there are cases where an error message is not returned but null is
         if pipeline_state.is_null() {
-            return Err("newRenderPipelineStateWithDescriptor returned null".into());
+            bail!("newRenderPipelineStateWithDescriptor returned null");
         }
 
         Ok(metal::RenderPipelineState::from_ptr(pipeline_state))
     }
 }
 
-fn convert_glsl_to_metal(name: &str, entry_point: &str, source: &str) -> Result<String> {
+fn convert_glsl_to_metal(name: &str, entry_point: &str, source: &str) -> Result<String, Error> {
     profile_scope!("convert_glsl_to_metal");
 
     // convert to SPIR-V using shaderc
@@ -436,7 +446,7 @@ fn convert_glsl_to_metal(name: &str, entry_point: &str, source: &str) -> Result<
             entry_point,
             Some(&options),
         )
-        .chain_err(|| "shaderc compilation to SPIRV failed")?;
+        .context("Shaderc compilation to SPIRV failed")?;
 
     // convert SPIR-V to MSL
 
@@ -444,22 +454,18 @@ fn convert_glsl_to_metal(name: &str, entry_point: &str, source: &str) -> Result<
 
     let mut ast = spirv_cross::spirv::Ast::<spirv_cross::msl::Target>::parse(&module).unwrap();
 
-    //    ast.compile().chain_err(|| "spirv-cross compilation failed")?
-
     profile_scope!("spirv_compile_to_metal");
 
     match ast.compile() {
         Ok(str) => Ok(str),
         Err(e) => match e {
-            spirv_cross::ErrorCode::Unhandled => Err("spirv-cross handled error".into()),
-            spirv_cross::ErrorCode::CompilationError(str) => {
-                Err(format!("spirv-cross error: {}", str).into())
-            }
+            spirv_cross::ErrorCode::Unhandled => bail!("spirv-cross handled error"),
+            spirv_cross::ErrorCode::CompilationError(str) => bail!("spirv-cross error: {}", str),
         },
     }
 }
 
-fn write_file<P: AsRef<Path>>(path: P, buf: &[u8]) -> Result<()> {
+fn write_file<P: AsRef<Path>>(path: P, buf: &[u8]) -> Result<(), Error> {
     if let Some(parent_path) = path.as_ref().parent() {
         std::fs::create_dir_all(parent_path)?;
     }

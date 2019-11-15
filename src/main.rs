@@ -7,21 +7,19 @@
 #![allow(dead_code)]
 #![warn(clippy::all)]
 #![warn(rust_2018_idioms)]
-#![recursion_limit = "1024"] // `error_chain!` can recurse deeply
 
-#[macro_use]
-extern crate error_chain;
 #[macro_use]
 extern crate clap;
 #[macro_use]
 extern crate thread_profiler;
-#[macro_use]
-extern crate log;
 
+use anyhow::{Context, Error};
 use clap::{App, Arg};
 use colored::*;
 use floating_duration::TimeAsFloat;
 use indicatif::{ProgressBar, ProgressStyle};
+use log::error;
+use log::info;
 use rayon::prelude::*;
 use rust_base58::ToBase58;
 use sha3::{Digest as Sha3Digest, Sha3_256};
@@ -48,24 +46,6 @@ extern crate cocoa;
 #[cfg(target_os = "macos")]
 use cocoa::foundation::NSAutoreleasePool;
 
-mod errors {
-    error_chain! {
-        links {
-            Shadertoy(::shadertoy::Error, ::shadertoy::ErrorKind);
-        }
-
-        foreign_links {
-            Fmt(::std::fmt::Error);
-            Io(::std::io::Error);
-            Json(::serde_json::error::Error);
-            Clap(::clap::Error);
-            Reqwest(::reqwest::Error);
-            Log(::log::SetLoggerError);
-        }
-    }
-}
-use errors::*;
-
 struct BuiltShadertoy {
     info: shadertoy::ShaderInfo,
 
@@ -74,7 +54,7 @@ struct BuiltShadertoy {
     pipeline_handle: RenderPipelineHandle,
 }
 
-fn write_file<P: AsRef<Path>>(path: P, buf: &[u8]) -> Result<()> {
+fn write_file<P: AsRef<Path>>(path: P, buf: &[u8]) -> Result<(), Error> {
     if let Some(parent_path) = path.as_ref().parent() {
         std::fs::create_dir_all(parent_path)?;
     }
@@ -84,14 +64,18 @@ fn write_file<P: AsRef<Path>>(path: P, buf: &[u8]) -> Result<()> {
     Ok(())
 }
 
-fn search(client: &shadertoy::Client, matches: &clap::ArgMatches<'_>) -> Result<Vec<String>> {
+fn search(
+    http_client: &reqwest::blocking::Client,
+    api_key: &str,
+    matches: &clap::ArgMatches<'_>,
+) -> Result<Vec<String>, Error> {
     profile_scope!("search");
 
     use std::str::FromStr;
 
     // create search parameters
 
-    let search_params = shadertoy::SearchParams {
+    let search_query = shadertoy::SearchQuery {
         string: matches.value_of("search").unwrap_or(""),
 
         sort_order: value_t!(matches, "order", shadertoy::SearchSortOrder)?,
@@ -102,30 +86,30 @@ fn search(client: &shadertoy::Client, matches: &clap::ArgMatches<'_>) -> Result<
                 .collect(),
             None => vec![],
         },
+
+        api_key: api_key,
     };
 
-    println!("{:?}", search_params);
+    println!("{:?}", search_query);
 
     // check if we can find a cached search on disk
 
     let path = format!(
         "output/query/{}",
-        serde_json::to_string(&search_params)?
-            .as_bytes()
-            .to_base58()
+        serde_json::to_string(&search_query)?.as_bytes().to_base58()
     );
 
     if let Ok(mut file) = File::open(&path) {
         let mut json_str = String::new();
         file.read_to_string(&mut json_str)
-            .chain_err(|| "failed reading json shader file")?;
+            .context("Failed reading json shader file")?;
         let search_result: serde_json::Result<Vec<String>> = serde_json::from_str(&json_str);
-        search_result.chain_err(|| "shader query json deserialization failed")
+        search_result.context("Shader query json deserialization failed")
     } else {
         // issue the actual request
-        match client
-            .search(&search_params)
-            .chain_err(|| "shadertoy search failed")
+        match search_query
+            .issue_blocking(http_client)
+            .context("Shadertoy search failed")
         {
             Ok(result) => {
                 // cache search results to a file on disk
@@ -140,13 +124,13 @@ fn search(client: &shadertoy::Client, matches: &clap::ArgMatches<'_>) -> Result<
 fn download(
     matches: &clap::ArgMatches<'_>,
     render_backend: &Option<Box<dyn RenderBackend>>,
-) -> Result<Vec<BuiltShadertoy>> {
+) -> Result<Vec<BuiltShadertoy>, Error> {
     profile_scope!("download");
 
     let time = Instant::now();
 
     let api_key = matches.value_of("apikey").unwrap();
-    let client = shadertoy::Client::new(api_key);
+    let http_client = reqwest::blocking::Client::new();
 
     let pb = ProgressBar::new_spinner();
     pb.set_style(ProgressStyle::default_spinner().template("")); // workaround
@@ -156,7 +140,7 @@ fn download(
         ProgressStyle::default_spinner().template("{spinner:.green}  Searching{wide_msg}"),
     );
 
-    let shadertoys_found = search(&client, matches)?;
+    let shadertoys_found = search(&http_client, &api_key, matches)?;
     let shadertoys_found_len = shadertoys_found.len();
     let shadertoys_dl_len: i64 = matches.value_of("limit").unwrap().parse().unwrap();
     let shadertoys_len = if shadertoys_dl_len == -1 {
@@ -184,14 +168,18 @@ fn download(
 
     {
         // closure for processing a shadertoy
-        let process_shadertoy = |shadertoy| -> Result<()> {
+        let process_shadertoy = |shadertoy| -> Result<(), Error> {
             let path = PathBuf::from(format!("output/shader/{}/{}.json", shadertoy, shadertoy));
 
             let shader;
 
             if !path.exists() {
                 profile_scope!("shader_json_query");
-                shader = client.get_shader(shadertoy)?;
+                shader = shadertoy::ShaderQuery {
+                    api_key,
+                    shader_id: shadertoy,
+                }
+                .issue_blocking(&http_client)?;
                 write_file(&path, serde_json::to_string_pretty(&shader)?.as_bytes())?;
             } else {
                 profile_scope!("shader_json_file_load");
@@ -340,8 +328,7 @@ fn download(
                     let path = PathBuf::from(format!("output{}", input.src));
 
                     if !path.exists() {
-                        let mut data_response = client
-                            .rest_client
+                        let mut data_response = http_client
                             .get(&format!("https://www.shadertoy.com/{}", input.src))
                             .send()?;
 
@@ -423,7 +410,7 @@ fn download(
     Ok(built_shadertoys)
 }
 
-fn run() -> Result<()> {
+fn run() -> Result<(), Error> {
     let matches = App::new("Shadertoy Browser")
         .version(crate_version!())
         .author("Johan Andersson <repi@repi.se>")
@@ -549,12 +536,16 @@ fn run() -> Result<()> {
 
     #[cfg(target_os = "macos")]
     {
-        match MetalRenderBackend::new() {
-            Ok(rb) => render_backend = Some(Box::new(rb)),
-            Err(err) => {
-                render_backend = None;
-                println!("Unable to create metal render backend, error: {}", err);
+        render_backend = if !matches.is_present("headless") {
+            match MetalRenderBackend::new() {
+                Ok(rb) => Some(Box::new(rb)),
+                Err(err) => {
+                    println!("Unable to create metal render backend, error: {}", err);
+                    None
+                }
             }
+        } else {
+            None
         }
     }
 
@@ -568,7 +559,7 @@ fn run() -> Result<()> {
     // download and process assets
 
     let mut built_shadertoy_shaders =
-        download(&matches, &render_backend).chain_err(|| "query for shaders failed")?;
+        download(&matches, &render_backend).context("Query for shaders failed")?;
 
     // write out profiler data for startup
     {
@@ -587,7 +578,7 @@ fn run() -> Result<()> {
     }
 
     let mut render_backend =
-        render_backend.chain_err(|| "skipping rendering, as have no renderer available")?;
+        render_backend.context("Skipping rendering, as have no renderer available")?;
 
     // set up rendering window
 
@@ -607,7 +598,7 @@ fn run() -> Result<()> {
         ))
         .with_title("Shadertoy Browser".to_string())
         .build(&events_loop)
-        .chain_err(|| "error creating window")?;
+        .context("Error creating window")?;
 
     render_backend.init_window(&window);
 
@@ -795,7 +786,7 @@ fn run() -> Result<()> {
         });
         #[cfg(target_os = "macos")]
         unsafe {
-            //            msg_send![pool, release];
+            let _: f32 = msg_send![pool, release];
             pool = NSAutoreleasePool::new(cocoa::base::nil);
         }
     }
@@ -803,13 +794,6 @@ fn run() -> Result<()> {
     Ok(())
 }
 
-fn main() {
-    if let Err(ref e) = run() {
-        use error_chain::ChainedError;
-        let stderr = &mut ::std::io::stderr();
-        let errmsg = "Error writing to stderr";
-
-        writeln!(stderr, "{}", e.display_chain()).expect(errmsg);
-        ::std::process::exit(1);
-    }
+fn main() -> Result<(), Error> {
+    run()
 }
