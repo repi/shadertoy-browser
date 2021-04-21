@@ -13,6 +13,7 @@ pub struct Shader {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub struct ShaderInfo {
     pub id: String,
     pub date: String,
@@ -25,6 +26,7 @@ pub struct ShaderInfo {
     pub flags: u64,
     pub tags: Vec<String>,
     pub hasliked: u64,
+    pub use_preview: u64,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
