@@ -39,7 +39,7 @@ pub struct SearchParams<'a> {
 /// Client for issuing queries against the Shadertoy API and database
 pub struct Client {
     pub api_key: String,
-    pub rest_client: reqwest::Client,
+    pub rest_client: reqwest::blocking::Client,
 }
 
 impl FromStr for SearchSortOrder {
@@ -79,7 +79,7 @@ impl Client {
     pub fn new(api_key: &str) -> Client {
         Client {
             api_key: api_key.to_string(),
-            rest_client: reqwest::Client::new(),
+            rest_client: reqwest::blocking::Client::new(),
         }
     }
 
@@ -153,14 +153,14 @@ impl Client {
 
     /// Retrives a shader given an id.
     pub fn get_shader(&self, shader_id: &str) -> Result<Shader> {
-        let json_str = self
+        let json = self
             .rest_client
             .get(&format!(
                 "https://www.shadertoy.com/api/v1/shaders/{}?key={}",
                 shader_id, self.api_key
             ))
             .send()?
-            .text()?;
+            .json::<ShaderRoot>()?;
 
         #[derive(Serialize, Deserialize, Debug)]
         #[serde(deny_unknown_fields)]
@@ -173,16 +173,9 @@ impl Client {
             shader: Shader,
         }
 
-        match serde_json::from_str::<ShaderRoot>(&json_str) {
-            Ok(r) => {
-                if !r.error.is_empty() {
-                    bail!("Shadertoy REST shader query returned error: {}", r.error);
-                }
-                Ok(r.shader)
-            }
-            Err(err) => {
-                Err(Error::from(err)).chain_err(|| "JSON parsing of Shadertoy shader rootfailed")
-            }
+        if !json.error.is_empty() {
+            bail!("Shadertoy REST shader query returned error: {}", json.error);
         }
+        Ok(json.shader)
     }
 }

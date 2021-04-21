@@ -1,6 +1,4 @@
 use cocoa;
-use core_graphics;
-use foreign_types;
 use libc;
 use metal;
 use shaderc;
@@ -9,12 +7,11 @@ use winit;
 
 use crate::errors::*;
 use crate::render::*;
-use crate::render_metal::core_graphics::geometry::CGSize;
 use chrono::prelude::*;
 use cocoa::appkit::{NSView, NSWindow};
 use cocoa::base::id as cocoa_id;
 use floating_duration::TimeAsFloat;
-use foreign_types::ForeignType;
+use foreign_types_shared::ForeignType;
 use objc::runtime::{Object, YES};
 use std::any::Any;
 use std::cell::RefCell;
@@ -26,7 +23,7 @@ use std::mem;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::Instant;
-use winit::os::macos::WindowExt;
+use winit::platform::macos::WindowExtMacOS;
 
 struct MetalRenderPipeline {
     pipeline_state: metal::RenderPipelineState,
@@ -38,7 +35,7 @@ pub struct MetalRenderBackend {
     device: metal::Device,
     command_queue: metal::CommandQueue,
 
-    layer: Option<metal::CoreAnimationLayer>,
+    layer: Option<metal::MetalLayer>,
     dpi_factor: f32,
 
     frame_index: u64,
@@ -164,11 +161,11 @@ impl MetalRenderBackend {
 
 impl RenderBackend for MetalRenderBackend {
     fn init_window(&mut self, window: &dyn Any) {
-        let winit_window = window.downcast_ref::<winit::Window>().unwrap();
+        let winit_window = window.downcast_ref::<winit::window::Window>().unwrap();
 
-        let cocoa_window: cocoa_id = unsafe { mem::transmute(winit_window.get_nswindow()) };
+        let cocoa_window: cocoa_id = unsafe { mem::transmute(winit_window.ns_window()) };
 
-        let layer = metal::CoreAnimationLayer::new();
+        let layer = metal::MetalLayer::new();
         layer.set_device(&self.device);
         layer.set_pixel_format(metal::MTLPixelFormat::BGRA8Unorm);
         layer.set_presents_with_transaction(false);
@@ -180,12 +177,12 @@ impl RenderBackend for MetalRenderBackend {
             view.setLayer(mem::transmute(layer.as_ref()));
         }
 
-        let draw_size = winit_window.get_inner_size().unwrap();
-        layer.set_drawable_size(CGSize::new(draw_size.width.into(), draw_size.height.into()));
+        let draw_size = winit_window.inner_size();
+        layer.set_drawable_size(metal::CGSize::new(draw_size.width.into(), draw_size.height.into()));
 
         self.layer = Some(layer);
 
-        self.dpi_factor = winit_window.get_hidpi_factor() as f32;
+        self.dpi_factor = winit_window.scale_factor() as f32;
     }
 
     fn render_frame(&mut self, params: RenderParams<'_>) {
