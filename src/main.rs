@@ -268,9 +268,9 @@ fn download(
                     && pass.inputs.is_empty()
                     && shader.renderpass.len() == 1
                 {
-                    // these shaders get stuck in forever compilation, so let's skip them forn ow
+                    // these shaders get stuck in forever compilation, so let's skip them for now
                     // TODO should make compilation more robust and be able to timeout and then remove this
-                    let skip_shaders = ["XdsBzj", "XtlSD7", "MlB3Wt", "4ssfzj", "XllSWf", "4td3z4"];
+                    let skip_shaders = ["XllSWf", "ll2BWz", "4sG3Wy", "XdsBzj", "4td3z4"];
 
                     if skip_shaders.contains(&shader.info.id.as_str()) {
                         continue;
