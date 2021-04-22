@@ -48,6 +48,9 @@ extern crate cocoa;
 #[cfg(target_os = "macos")]
 use cocoa::foundation::NSAutoreleasePool;
 
+#[cfg(feature = "wgpu-backend")]
+mod render_wgpu;
+
 mod errors {
     error_chain! {
         links {
@@ -243,6 +246,9 @@ fn download(
                     ));
                 }
 
+                #[cfg(feature = "wgpu-backend")]
+                let header_source = include_str!("shadertoy_header_wgpu.glsl");
+                #[cfg(not(feature = "wgpu-backend"))]
                 let header_source = include_str!("shadertoy_header.glsl");
                 let image_footer_source = include_str!("shadertoy_image_footer.glsl");
                 let sound_footer_source = include_str!("shadertoy_sound_footer.glsl");
@@ -270,7 +276,15 @@ fn download(
                 {
                     // these shaders get stuck in forever compilation, so let's skip them for now
                     // TODO should make compilation more robust and be able to timeout and then remove this
+                    #[cfg(not(feature = "wgpu-backend"))]
                     let skip_shaders = ["XllSWf", "ll2BWz", "4sG3Wy", "XdsBzj", "4td3z4"];
+                    #[cfg(feature = "wgpu-backend")]
+                    let skip_shaders = [
+                        // wgpu/linux
+                        "4sjBDG", "MlyGWh", "4ll3RS", "WdX3zl", "wsjXz1",
+                        // STACK PROBLEMS
+                        "MsBcRG", "wsyGzt",
+                    ];
 
                     if skip_shaders.contains(&shader.info.id.as_str()) {
                         continue;
@@ -545,9 +559,9 @@ fn run() -> Result<()> {
 
     // setup renderer
 
-    let render_backend: Option<Box<dyn RenderBackend>>;
+    let mut render_backend: Option<Box<dyn RenderBackend>> = None;
 
-    #[cfg(target_os = "macos")]
+    #[cfg(all(target_os = "macos", not(feature = "wgpu-backend")))]
     {
         match MetalRenderBackend::new() {
             Ok(rb) => render_backend = Some(Box::new(rb)),
@@ -558,12 +572,36 @@ fn run() -> Result<()> {
         }
     }
 
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(feature = "wgpu-backend")]
     {
-        render_backend = None;
+        render_backend = Some(Box::new(render_wgpu::WgpuRenderBackend::new()));
     }
 
     thread_profiler::register_thread_with_profiler();
+
+    // set up rendering window
+
+    let event_loop = winit::event_loop::EventLoop::new();
+    let window = winit::window::WindowBuilder::new()
+        .with_inner_size(winit::dpi::LogicalSize::new(
+            matches
+                .value_of("res_width")
+                .unwrap()
+                .parse::<f64>()
+                .unwrap(),
+            matches
+                .value_of("res_height")
+                .unwrap()
+                .parse::<f64>()
+                .unwrap(),
+        ))
+        .with_title("Shadertoy Browser".to_string())
+        .build(&event_loop)
+        .chain_err(|| "error creating window")?;
+
+    if let Some(render_backend) = render_backend.as_mut() {
+        render_backend.init_window(&window);
+    }
 
     // download and process assets
 
@@ -588,28 +626,6 @@ fn run() -> Result<()> {
 
     let mut render_backend =
         render_backend.chain_err(|| "skipping rendering, as have no renderer available")?;
-
-    // set up rendering window
-
-    let event_loop = winit::event_loop::EventLoop::new();
-    let window = winit::window::WindowBuilder::new()
-        .with_inner_size(winit::dpi::LogicalSize::new(
-            matches
-                .value_of("res_width")
-                .unwrap()
-                .parse::<f64>()
-                .unwrap(),
-            matches
-                .value_of("res_height")
-                .unwrap()
-                .parse::<f64>()
-                .unwrap(),
-        ))
-        .with_title("Shadertoy Browser".to_string())
-        .build(&event_loop)
-        .chain_err(|| "error creating window")?;
-
-    render_backend.init_window(&window);
 
     #[cfg(target_os = "macos")]
     let mut pool = unsafe { NSAutoreleasePool::new(cocoa::base::nil) };
