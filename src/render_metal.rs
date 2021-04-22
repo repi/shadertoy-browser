@@ -218,23 +218,23 @@ impl RenderBackend for MetalRenderBackend {
 
                         let dt: DateTime<Local> = Local::now();
 
-                        let mut mouse = (
+                        let mut mouse = [
                             (params.mouse_pos.0 as f32) / self.dpi_factor,
                             (params.mouse_pos.1 as f32) / self.dpi_factor,
                             (params.mouse_click_pos.0 as f32) / self.dpi_factor,
                             (params.mouse_click_pos.1 as f32) / self.dpi_factor,
-                        );
+                        ];
 
                         // flip y
-                        if mouse.1 > 0.0 {
-                            mouse.1 = h - mouse.1;
+                        if mouse[1] > 0.0 {
+                            mouse[1] = h - mouse[1];
                         }
-                        if mouse.3 > 0.0 {
-                            mouse.3 = h - mouse.3;
+                        if mouse[3] > 0.0 {
+                            mouse[3] = h - mouse[3];
                         }
 
                         ShadertoyConstants {
-                            iResolution: ((quad.size.0 * w), (quad.size.1 * h), w / h),
+                            iResolution: [(quad.size.0 * w), (quad.size.1 * h), w / h],
                             pad1: 0.0,
                             iMouse: mouse,
                             iTime: time,
@@ -242,22 +242,17 @@ impl RenderBackend for MetalRenderBackend {
                             iFrameRate: 1.0 / delta_time,
                             iSampleRate: 44100.0,
                             iFrame: self.frame_index as i32,
-                            pad2: [0, 0, 0],
-                            iDate: (
+                            pad2: [0; 3],
+                            iDate: [
                                 dt.year() as f32,
                                 dt.month() as f32,
                                 dt.day() as f32,
                                 dt.second() as f32, // TODO unclear what seconds should be here?
-                            ),
-                            iChannelTime: [time, time, time, time], // TODO not correct
-                            iChannelResolution: [
-                                (0.0, 0.0, 0.0, 0.0),
-                                (0.0, 0.0, 0.0, 0.0),
-                                (0.0, 0.0, 0.0, 0.0),
-                                (0.0, 0.0, 0.0, 0.0),
                             ],
+                            iChannelTime: [time; 4], // TODO not correct
+                            iChannelResolution: [[0.0; 4], [0.0; 4], [0.0; 4], [0.0; 4]],
                             iBlockOffset: 0.0,
-                            pad3: [0.0, 0.0, 0.0],
+                            pad3: [0.0; 3],
                         }
                     };
 
