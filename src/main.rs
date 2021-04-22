@@ -280,9 +280,9 @@ fn download(
                     let skip_shaders = ["XllSWf", "ll2BWz", "4sG3Wy", "XdsBzj", "4td3z4"];
                     #[cfg(feature = "wgpu-backend")]
                     let skip_shaders = [
-                        // wgpu/linux
+                        // Vulkan
                         "4sjBDG", "MlyGWh", "4ll3RS", "WdX3zl", "wsjXz1",
-                        // STACK PROBLEMS
+                        // Vulkan stack overflows
                         "MsBcRG", "wsyGzt",
                     ];
 

@@ -83,6 +83,8 @@ impl RenderBackend for WgpuRenderBackend {
             ))
             .unwrap();
 
+            device.on_uncaptured_error(|error| log::error!("Captured error: {}", error));
+
             let swapchain_desc = wgpu::SwapChainDescriptor {
                 usage: wgpu::TextureUsage::RENDER_ATTACHMENT,
                 format: display_format,
