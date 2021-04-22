@@ -284,6 +284,8 @@ fn download(
                         "4sjBDG", "MlyGWh", "4ll3RS", "WdX3zl", "wsjXz1",
                         // Vulkan stack overflows
                         "MsBcRG", "wsyGzt",
+                        // Metal
+                        "3sfGDS", "tssfW2",
                     ];
 
                     if skip_shaders.contains(&shader.info.id.as_str()) {

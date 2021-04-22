@@ -41,9 +41,11 @@ thread_profiler = "0.3.0"
 log = "0.4.14"
 fern = "0.6.0"
 sha3 = "0.9.1"
-wgpu = { version ="0.7.1", optional = true }
+wgpu = { git = "https://github.com/gfx-rs/wgpu-rs", optional = true }
 pollster = { version = "0.2.3", optional = true }
 bytemuck = { version = "1.5.1", features = ["derive"], optional = true }
+# Only to fix wgpu package conflicts
+js-sys = { version = "0.3.50", optional = true }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 cocoa = "0.24.0"

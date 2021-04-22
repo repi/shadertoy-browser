@@ -68,7 +68,7 @@ impl RenderBackend for WgpuRenderBackend {
                 .ok_or_else(|| "Failed to request an adapter")
                 .unwrap();
 
-            let display_format = adapter.get_swap_chain_preferred_format(&surface);
+            let display_format = adapter.get_swap_chain_preferred_format(&surface).unwrap();
 
             let (device, queue) = pollster::block_on(adapter.request_device(
                 &wgpu::DeviceDescriptor {
@@ -149,8 +149,8 @@ impl RenderBackend for WgpuRenderBackend {
 
             let mut render_pass = command_encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("render pass"),
-                color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
-                    attachment: &frame.output.view,
+                color_attachments: &[wgpu::RenderPassColorAttachment {
+                    view: &frame.output.view,
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color {
