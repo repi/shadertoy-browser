@@ -63,7 +63,7 @@ impl RenderBackend for WgpuRenderBackend {
             let adapter =
                 pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
                     compatible_surface: Some(&surface),
-                    ..Default::default()
+                    power_preference: wgpu::PowerPreference::HighPerformance,
                 }))
                 .ok_or_else(|| "Failed to request an adapter")
                 .unwrap();
