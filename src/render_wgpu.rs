@@ -95,10 +95,9 @@ impl RenderBackend for WgpuRenderBackend {
 
             let swapchain = device.create_swap_chain(&surface, &swapchain_desc);
 
-            let mut vertex_module_desc = wgpu::include_spirv!("shadertoy_vs.vert.spv");
-            vertex_module_desc.flags = wgpu::ShaderFlags::empty();
-
-            let vertex_shader = device.create_shader_module(&vertex_module_desc);
+            let vertex_shader = device.create_shader_module(
+                &wgpu::include_spirv!("shadertoy_vs.vert.spv")
+            );
 
             let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("pipeline layout"),
@@ -281,7 +280,7 @@ impl RenderBackend for WgpuRenderBackend {
             .create_shader_module(&wgpu::ShaderModuleDescriptor {
                 label: Some(shader_path),
                 source: spv_source,
-                flags: wgpu::ShaderFlags::empty(),
+                flags: wgpu::ShaderFlags::default(),
             });
 
         let pipeline = inner

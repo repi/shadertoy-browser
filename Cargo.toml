@@ -44,8 +44,6 @@ sha3 = "0.9.1"
 wgpu = { git = "https://github.com/gfx-rs/wgpu-rs", optional = true }
 pollster = { version = "0.2.3", optional = true }
 bytemuck = { version = "1.5.1", features = ["derive"], optional = true }
-# Only to fix wgpu package conflicts
-js-sys = { version = "0.3.50", optional = true }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 cocoa = "0.24.0"
