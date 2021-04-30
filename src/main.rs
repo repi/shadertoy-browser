@@ -286,6 +286,8 @@ fn download(
                         "MsBcRG", "wsyGzt",
                         // Metal
                         "3sfGDS", "tssfW2",
+                        // DirectX 12
+                        "WsjBW1",
                     ];
 
                     if skip_shaders.contains(&shader.info.id.as_str()) {
