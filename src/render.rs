@@ -3,13 +3,17 @@ use std::any::Any;
 use crate::errors::*;
 
 #[repr(C)]
+#[cfg_attr(
+    feature = "wgpu-backend",
+    derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)
+)]
 #[allow(non_snake_case)]
 pub struct ShadertoyConstants {
     // The viewport resolution (z is pixel aspect ratio, usually 1.0).
-    pub iResolution: (f32, f32, f32),
+    pub iResolution: [f32; 3],
     pub pad1: f32,
     /// xy contain the current pixel coords (if LMB is down). zw contain the click pixel.
-    pub iMouse: (f32, f32, f32, f32),
+    pub iMouse: [f32; 4],
     /// Current time in seconds.
     pub iTime: f32,
     /// Delta time since last frame.
@@ -22,11 +26,11 @@ pub struct ShadertoyConstants {
     pub iFrame: i32,
     pub pad2: [i32; 3],
     /// Year, month, day, time in seconds in .xyzw
-    pub iDate: (f32, f32, f32, f32),
+    pub iDate: [f32; 4],
     /// Time for channel (if video or sound), in seconds.
     pub iChannelTime: [f32; 4],
     /// Input texture resolution for each channel.
-    pub iChannelResolution: [(f32, f32, f32, f32); 4],
+    pub iChannelResolution: [[f32; 4]; 4],
     pub iBlockOffset: f32,
     pub pad3: [f32; 3],
 }

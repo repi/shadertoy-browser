@@ -41,6 +41,9 @@ thread_profiler = "0.3.0"
 log = "0.4.14"
 fern = "0.6.0"
 sha3 = "0.9.1"
+wgpu = { version = "0.8.0", optional = true }
+pollster = { version = "0.2.3", optional = true }
+bytemuck = { version = "1.5.1", features = ["derive"], optional = true }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 cocoa = "0.24.0"
@@ -54,5 +57,6 @@ foreign-types-shared = "0.1.1"
 debug = true
 
 [features]
-default = [ "profiler"]
+default = ["profiler", "wgpu-backend"]
 profiler = ["thread_profiler/thread_profiler"]
+wgpu-backend = ["wgpu", "pollster", "bytemuck"]
